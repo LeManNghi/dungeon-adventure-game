@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="vi"><head><meta charset="utf-8"><title>Browser QA</title></head><body><pre id="results">RUNNING</pre><iframe id="app" src="/" width="1440" height="1100"></iframe><script type="module">
+const frame=document.querySelector('#app'), out=document.querySelector('#results'), results=[];
+const delay=ms=>new Promise(r=>setTimeout(r,ms));
+const check=(condition,label)=>{if(!condition) throw new Error(label);results.push('PASS '+label)};
+try {
+  await new Promise(r=>frame.addEventListener('load',r,{once:true}));
+  const doc=frame.contentDocument, win=frame.contentWindow;
+  const errors=[];win.addEventListener('error',e=>errors.push(e.message));win.addEventListener('unhandledrejection',e=>errors.push(String(e.reason)));
+  for(let i=0;i<100 && doc.querySelector('#scene-state').textContent.includes('TẢI');i++) await delay(100);
+  check(!doc.querySelector('#scene-state').textContent.includes('LỖI'),'all assets decode');
+  const canvas=doc.querySelector('canvas');
+  const turn=()=>Number(doc.querySelector('#scene-state').textContent.match(/LƯỢT (\d+)/)[1]);
+  const press=(key,repeat=false)=>win.dispatchEvent(new win.KeyboardEvent('keydown',{key,repeat,bubbles:true,cancelable:true}));
+  canvas.focus();
+  press(' '); check(turn()===1,'wait consumes one turn');
+  press('d');press('d');check(turn()===1,'rapid inputs locked during animation');
+  await delay(250);press(' ',true);check(turn()===1,'held key repeat ignored');
+  press('Escape');press('d');check(turn()===1,'pause blocks actions');press('Escape');
+  doc.querySelector('#restart').click();check(turn()===0,'restart resets turn');
+  canvas.focus();
+  for(let i=0;i<3;i++){press('a');await delay(220)}
+  check(turn()===3,'three valid movement actions');press('a');check(turn()===3,'wall collision does not consume turn');
+  win.dispatchEvent(new win.Event('blur'));check(doc.querySelector('#overlay').hidden===false,'focus loss pauses');doc.querySelector('#continue').click();
+  doc.querySelector('[data-mode="lab"]').click();
+  for(let i=0;i<4;i++){const select=doc.querySelector('#fixture');select.value=String(i);select.dispatchEvent(new win.Event('change'));await delay(50);check(doc.querySelector('#scene-name').textContent.startsWith('02'),'fixture '+i+' renders')}
+  for(const id of ['grid','ids','collision']){const input=doc.querySelector('#'+id);input.checked=true;input.dispatchEvent(new win.Event('change'))}
+  doc.querySelector('[data-mode="assets"]').click();
+  const options=Array.from(doc.querySelector('#asset').options).map(o=>o.value);
+  check(options.length===38,'38 assets listed');
+  for(const path of options){const select=doc.querySelector('#asset');select.value=path;select.dispatchEvent(new win.Event('change'));await delay(25)}
+  check(true,'all 38 assets inspected through UI');
+  for(const name of ['front','back','left','right']){const select=doc.querySelector('#asset');select.value='Characters/Monster/BossMonster_walk_'+name+'.png';select.dispatchEvent(new win.Event('change'));await delay(100);check(doc.querySelector('#context').textContent.includes('16 × 64'),'boss '+name+' preview')}
+  doc.querySelector('[data-mode="combat"]').click();check(turn()===3,'inspector never advances combat');
+  doc.querySelector('#restart').click();
+  canvas.focus();
+  for(let i=0;i<35;i++){press('d');await delay(210);if(!doc.querySelector('#overlay').hidden)break}
+  check(doc.querySelector('#overlay').textContent.includes('Bạn vẫn còn ánh lửa'),'victory through gameplay');
+  doc.querySelector('#continue').click();check(turn()===0,'victory restart through UI');
+  canvas.focus();
+  for(let i=0;i<45;i++){press(' ');await delay(200);if(!doc.querySelector('#overlay').hidden)break}
+  check(doc.querySelector('#overlay').textContent.includes('Bóng tối thắng'),'death overlay through gameplay');
+  doc.querySelector('#continue').click();check(turn()===0,'death restart through UI');
+  check(errors.length===0,'no runtime errors: '+errors.join('; '));
+  out.textContent='ALL PASS\n'+results.join('\n');
+} catch(error){out.textContent='FAIL '+error.stack+'\n'+results.join('\n')}
+</script></body></html>

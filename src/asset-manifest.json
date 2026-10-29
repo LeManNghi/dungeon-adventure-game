@@ -1,0 +1,192 @@
+[
+  {
+    "path": "Characters/Monster/BossMonster_walk_back.png",
+    "width": 16,
+    "height": 64
+  },
+  {
+    "path": "Characters/Monster/BossMonster_walk_front.png",
+    "width": 16,
+    "height": 64
+  },
+  {
+    "path": "Characters/Monster/BossMonster_walk_left.png",
+    "width": 16,
+    "height": 64
+  },
+  {
+    "path": "Characters/Monster/BossMonster_walk_right.png",
+    "width": 16,
+    "height": 64
+  },
+  {
+    "path": "Characters/Monster/Monster_walk_back.png",
+    "width": 16,
+    "height": 64
+  },
+  {
+    "path": "Characters/Monster/Monster_walk_front.png",
+    "width": 16,
+    "height": 64
+  },
+  {
+    "path": "Characters/Monster/Monster_walk_left.png",
+    "width": 16,
+    "height": 64
+  },
+  {
+    "path": "Characters/Monster/Monster_walk_right.png",
+    "width": 16,
+    "height": 64
+  },
+  {
+    "path": "Characters/Player/Player_idle.png",
+    "width": 17,
+    "height": 85
+  },
+  {
+    "path": "Characters/Player/Player_walk_behind.png",
+    "width": 17,
+    "height": 136
+  },
+  {
+    "path": "Characters/Player/Player_walk_front.png",
+    "width": 17,
+    "height": 119
+  },
+  {
+    "path": "Characters/Player/Player_walk_left.png",
+    "width": 17,
+    "height": 136
+  },
+  {
+    "path": "Characters/Player/Player_walk_right.png",
+    "width": 17,
+    "height": 136
+  },
+  {
+    "path": "Characters/Player/Player.png",
+    "width": 17,
+    "height": 17
+  },
+  {
+    "path": "Characters/Warrior/warrior_walk_behind.png",
+    "width": 22,
+    "height": 264
+  },
+  {
+    "path": "Characters/Warrior/warrior_walk_front.png",
+    "width": 22,
+    "height": 264
+  },
+  {
+    "path": "Characters/Warrior/warrior_walk_left.png",
+    "width": 22,
+    "height": 176
+  },
+  {
+    "path": "Characters/Warrior/warrior_walk_right.png",
+    "width": 22,
+    "height": 176
+  },
+  {
+    "path": "Map/Decorations_tileset.png",
+    "width": 160,
+    "height": 160
+  },
+  {
+    "path": "Map/Map_tileset.png",
+    "width": 288,
+    "height": 160
+  },
+  {
+    "path": "Map/Spike.png",
+    "width": 16,
+    "height": 64
+  },
+  {
+    "path": "Map/Torch_left.png",
+    "width": 32,
+    "height": 48
+  },
+  {
+    "path": "Map/Torch_right.png",
+    "width": 32,
+    "height": 48
+  },
+  {
+    "path": "Map/Torch.png",
+    "width": 16,
+    "height": 48
+  },
+  {
+    "path": "Others/Coin.png",
+    "width": 16,
+    "height": 96
+  },
+  {
+    "path": "Others/DamagedSheet.png",
+    "width": 64,
+    "height": 64
+  },
+  {
+    "path": "Others/HUD.png",
+    "width": 80,
+    "height": 80
+  },
+  {
+    "path": "Others/Others.png",
+    "width": 64,
+    "height": 64
+  },
+  {
+    "path": "Others/Sheet.png",
+    "width": 64,
+    "height": 64
+  },
+  {
+    "path": "Weapons/Weapons_gold_left.png",
+    "width": 100,
+    "height": 125
+  },
+  {
+    "path": "Weapons/Weapons_gold_right.png",
+    "width": 100,
+    "height": 125
+  },
+  {
+    "path": "Weapons/Weapons_gold_up.png",
+    "width": 64,
+    "height": 80
+  },
+  {
+    "path": "Weapons/Weapons_normal_left.png",
+    "width": 100,
+    "height": 125
+  },
+  {
+    "path": "Weapons/Weapons_normal_right.png",
+    "width": 100,
+    "height": 125
+  },
+  {
+    "path": "Weapons/Weapons_normal_up.png",
+    "width": 64,
+    "height": 80
+  },
+  {
+    "path": "Weapons/Weapons_purple_left.png",
+    "width": 100,
+    "height": 125
+  },
+  {
+    "path": "Weapons/Weapons_purple_right.png",
+    "width": 100,
+    "height": 125
+  },
+  {
+    "path": "Weapons/Weapons_purple_up.png",
+    "width": 64,
+    "height": 80
+  }
+]
