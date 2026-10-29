@@ -279,11 +279,11 @@ Hoàn thành khi: có thể chơi liên tục từ đầu tới thắng hoặc t
 
 ### Mốc 5 — Hoàn thiện và cân bằng
 
-- [ ] Hiệu ứng vũ khí, trúng đòn, nhặt đồ và âm thanh.
-- [ ] HUD, hướng dẫn ngắn và nhật ký hành động.
-- [ ] Phân biệt rõ trang trí, vật tương tác và vật cản.
-- [ ] Cân bằng lượng hồi phục, phần thưởng, độ khó và thời lượng.
-- [ ] Kiểm tra kích thước màn hình và mất focus khi đang thao tác.
+- [x] Hiệu ứng vũ khí, trúng đòn, nhặt đồ và âm thanh.
+- [x] HUD, hướng dẫn ngắn và nhật ký hành động.
+- [x] Phân biệt rõ trang trí, vật tương tác và vật cản.
+- [x] Cân bằng lượt đầu lượng hồi phục, phần thưởng và độ khó; đánh giá số lượt bằng mô phỏng. Thời lượng thực tế cần người chơi xác nhận.
+- [x] Kiểm tra kích thước màn hình và mất focus khi đang thao tác.
 
 Hoàn thành khi: người mới nhận biết được mục tiêu, cách chơi và nguyên nhân thất bại; đồ họa rõ; không có lỗi chặn tiến trình đã biết.
 
@@ -306,7 +306,7 @@ Hoàn thành khi: người mới nhận biết được mục tiêu, cách chơi
 4. Hoàn thành vòng chơi ba tầng.
 5. Trau chuốt hình ảnh, âm thanh và mở rộng nội dung.
 
-Các số liệu về thời lượng, chỉ số và số lượng vật phẩm là mục tiêu ban đầu; chốt bằng kết quả chơi thử. Mốc 1–4 đã hoàn thành về chức năng và QA; thời lượng/độ khó tiếp tục điều chỉnh theo phản hồi người chơi. Mốc 5 chưa thực hiện.
+Các số liệu về thời lượng, chỉ số và số lượng vật phẩm là mục tiêu ban đầu; chốt bằng kết quả chơi thử. Mốc 1–5 đã có chức năng và QA tự động; độ khó và mục tiêu 15–25 phút tiếp tục kiểm chứng qua phản hồi người chơi thực tế.
 
 ## 11. Trạng thái triển khai mốc 1–2
 
@@ -360,7 +360,7 @@ Trong PowerShell, dùng `npm.cmd` nếu script `npm.ps1` của máy gặp lỗi 
 - R: chơi lại sau khi thắng/chết. Chơi lại giữ nguyên seed; nút seed mới tạo tầng khác.
 - Sinh vật áp sát; lính canh báo trước đòn quét bằng ô đỏ rồi có một lượt hồi sức.
 - Bẫy gai: vàng là báo trước, đỏ là nguy hiểm. Gây 5 sát thương lên cả người chơi lẫn địch.
-- Tàn hỏa đỏ: tăng 1 sát thương kiếm và hồi tối đa 8 HP, chỉ nhận một lần.
+- Tàn hỏa đỏ: tăng 1 sát thương vũ khí và hồi tối đa 6 HP, mỗi vật phẩm chỉ nhận một lần.
 - Bình máu: nhặt vào túi, tối đa ba bình trong mỗi chồng. Hồi tối đa 12 HP khi sử dụng; không tự uống khi nhặt.
 - Sàn đã khám phá được ghi nhớ; vị trí địch và vật phẩm ngoài tầm nhìn không hiển thị. Minimap chỉ ghi phần địa hình đã khám phá.
 - Tầng 3 kết thúc bằng boss. Cổng đóng khi vào đấu trường; hạ boss sẽ mở cổng và hiện màn thắng sau hiệu ứng chết. Thống kê gồm tầng, lượt, địch đã hạ, cấp và vàng.
@@ -411,3 +411,39 @@ Xem [docs/ASSETS.md](docs/ASSETS.md) để biết tọa độ cắt và giới h
 - Đã xem ảnh hai điểm tiếp tế, toàn map đấu trường, đòn húc, đập đất, cuồng nộ và màn thắng. Ảnh cục bộ `docs/m4-*.png`; báo cáo tương tác `docs/browser-qa-result.html`.
 - QA đã phát hiện và sửa việc màn thắng phụ thuộc vòng vẽ, cùng các nút dùng đồ còn bật ở điểm tiếp tế/khi đã kết thúc. Lượt QA cuối không ghi nhận lỗi JavaScript runtime.
 - Mốc 5 tiếp tục cân bằng độ khó/thời lượng, âm thanh, hướng dẫn và kiểm tra kích thước màn hình. Kết quả bot không thay thế phản hồi người chơi thực tế.
+
+## 15. Trạng thái triển khai mốc 5
+
+### Trải nghiệm và trình bày
+
+- Thêm giới thiệu ngắn có thể đóng và cẩm nang mở bằng nút Hướng dẫn / phím `?`. Giải thích rõ trang bị không tự tấn công; cách dùng ba vũ khí, thuốc, nâng cấp, tiếp tế, bẫy và boss. Hướng dẫn không tốn lượt, chặn thao tác thế giới, cuộn được trong khung; Esc đóng và trả focus về canvas.
+- HUD ưu tiên cảnh báo đang đứng trong vùng địch sắp đánh, hồi sức rìu, bẫy dưới chân, HP thấp, cầu thang và đồ chưa nhặt vì túi đầy. Nhật ký ghi nguồn và lượng sát thương; màn thua ghi đòn kết liễu. Cẩm nang phân biệt thùng/cửa chặn đường với đầu lâu/xương/đuốc trang trí, mô tả hình vật phẩm và dấu ! / × của nguy hiểm.
+- Hiện sprite vũ khí đang cầm, chuyển động đánh, viền trúng đòn, số hồi máu, vòng sáng nhặt đồ và nhân vật chết mờ dần. Chỉ khởi động hiệu ứng khi hành động hợp lệ; thời gian hiệu ứng được chặn ở 0 để tránh lỗi bán kính âm khi thời điểm vòng vẽ đi sau thao tác.
+- Âm thanh tổng hợp bằng Web Audio cho bước chân, đánh, trúng đòn, nhặt đồ, uống thuốc, lên cấp, báo đòn, trang bị, chết và chiến thắng. Chỉ khởi tạo sau thao tác, có tắt tiếng / âm lượng, giới hạn bốn âm mỗi hành động, không phát tín hiệu từ địch ngoài tầm nhìn. Tạm ngưng âm thanh khi rời cửa sổ / ẩn trang. Chưa thêm nhạc nền.
+- Tùy chọn giảm chuyển động tắt nội suy, animation đi, chuyển động vũ khí, viền chớp, vòng nhặt đồ, hiệu ứng chết và nhịp nháy cảnh báo; giữ dấu nguy hiểm và thông tin sát thương. Mặc định theo tùy chọn hệ điều hành. Âm thanh, âm lượng, chuyển động và việc đóng giới thiệu được lưu cục bộ; nếu trình duyệt chặn lưu trữ thì vẫn dùng được trong phiên hiện tại.
+- Canvas đổi số ô theo chiều rộng để giữ tile khoảng 32–48 px. Khung boss co theo canvas, minimap chuyển xuống dưới trong trận boss; map inspector thu vừa bản đồ, thư viện assets thu vừa khung. Giao diện nhỏ chuyển về một cột, bảng thông tin cuộn trong khung. Vẫn ưu tiên bàn phím, chưa có điều khiển cảm ứng.
+
+### Cân bằng lượt đầu
+
+Thông số tập trung ở `src/data/balance.ts`; giá tiếp tế trong `src/data/items.ts`:
+
+| Thông số | Trước | Sau |
+| --- | --- | --- |
+| Sức mạnh mỗi bậc vũ khí | +2 | +1 |
+| Tàn hỏa hồi máu | 8 HP | 6 HP |
+| Hồi máu khi hạ địch mỗi nâng cấp | 3 HP | 2 HP |
+| Vàng mỗi chỗ nhặt | 12 | 8 |
+| Giá thuốc / giáo / rìu / giáp | 8 / 14 / 14 / 12 | 10 / 18 / 18 / 16 |
+| HP boss | 90 | 105 |
+
+Giữ thuốc hồi 12 HP và thời gian báo trước / hồi sức của boss. Cùng bộ 12 seed, mô phỏng nền hoàn thành 12/12 trong 357–581 lượt; sau thay đổi hoàn thành 12/12 trong 362–592 lượt. Seed mặc định tăng từ 445 lên 449 lượt. Bot biết toàn map, thường vẫn còn nhiều HP; đây là kiểm tra tiến trình và cân bằng ban đầu, không chứng minh độ khó phù hợp người mới hoặc thời lượng 15–25 phút. Cần chơi thử thực tế để chốt hai mục tiêu đó. Đã sửa bot đánh giá trang bị theo chỉ số mới và tránh mắc kẹt nhặt đồ khi túi đầy.
+
+### Kiểm chứng và file phát triển
+
+- Build production thành công; 46/46 bài kiểm thử đạt, gồm dữ liệu map, chiến đấu/boss, cue theo lượt và ẩn cue ngoài tầm nhìn, cảnh báo nguy hiểm, lưu trữ bị chặn, khởi tạo/tắt tiếng/giới hạn âm thanh. Kiểm thử âm thanh dùng AudioContext giả lập; chưa đánh giá chất lượng nghe trên loa thực tế.
+- QA Chrome đạt 530 mục kiểm tra, chơi lại trọn ba tầng bằng 449 hành động hợp lệ, hai điểm tiếp tế, trận boss, thắng/thua và chơi lại. Kiểm tra `?`/Esc không tốn lượt, hướng dẫn khóa di chuyển, tùy chọn lưu được và không tốn lượt; khung rộng 390, 768, 1440 px không tràn ngang, tile dễ đọc, bảng hướng dẫn cuộn được; mất focus vẫn tạm dừng. Không ghi nhận lỗi JavaScript runtime trong lượt QA cuối.
+- Đã xem ảnh cẩm nang 390 px và đòn đập đất 1440 px: `docs/m5-help-390.png`, `docs/m5-boss-slam-1440.png`. Báo cáo QA và mô phỏng ở các file cục bộ đã nêu trong mục 13.
+- Thêm `src/ui/help.ts`, `src/ui/preferences.ts`, `src/systems/audio.ts`, `src/data/balance.ts`; sự kiện trình bày nằm trong `src/game/types.ts`. Luật theo lượt không phụ thuộc thời lượng âm thanh/hiệu ứng.
+- File kiểm thử tiếp tục được gitignore theo yêu cầu. README chỉ giới thiệu project; lệnh chạy và ghi chú phát triển ở tài liệu này.
+
+Chạy lại QA cục bộ: `powershell -ExecutionPolicy Bypass -File tools/browser-qa.ps1 -SkipScreenshots`. Chụp riêng một trạng thái: thêm `-Capture help -WindowWidth 390` hoặc `-Capture boss-slam -WindowWidth 1440` thay cho `-SkipScreenshots`. Các script này và thư mục tests chỉ có trên máy phát triển.

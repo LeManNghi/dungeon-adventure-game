@@ -1,6 +1,7 @@
 import type { Game } from '../game/Game'
 import { INVENTORY_LIMIT, makeItem, shopOffers, weaponDescriptions } from '../data/items'
 import { upgrades } from '../data/upgrades'
+import { balance } from '../data/balance'
 
 export function playerPanel(g:Game) {
   const p=g.player,potion=g.inventory.find(i=>i.kind==='potion')
@@ -15,7 +16,7 @@ export function inventoryPanel(g:Game) {
   return `<div class="modal-content"><p class="eyebrow">HÀNH TRANG · ${g.inventory.length}/${INVENTORY_LIMIT}</p><h2>Chuẩn bị bước tiếp theo.</h2><p>Mở túi không tốn lượt. Trang bị, bỏ đồ hoặc uống thuốc tốn một lượt và địch sẽ hành động.</p>
   <div class="item-list">${g.inventory.map(i=>{
     const equipped=i.uid===g.weaponUid||i.uid===g.armorUid
-    return `<article class="item-row"><div><strong>${i.name}${i.quantity>1?` ×${i.quantity}`:''}</strong><small>${i.kind==='potion'?'Hồi tối đa 12 HP':i.kind==='armor'?`Giảm ${i.power} sát thương mỗi đòn`:weaponDescriptions[i.id as keyof typeof weaponDescriptions]}${equipped?' · ĐANG TRANG BỊ':''}</small></div><div>${i.kind==='potion'?`<button data-use="${g.inventory.filter(a=>a.kind==='potion').indexOf(i)}" ${g.player.hp===g.player.maxHp||g.recovering?'disabled':''}>Uống</button>`:`<button data-equip="${i.uid}" ${equipped||g.recovering?'disabled':''}>Trang bị</button>`}<button data-drop="${i.uid}" ${equipped||g.recovering?'disabled':''}>Bỏ</button></div></article>`
+    return `<article class="item-row"><div><strong>${i.name}${i.quantity>1?` ×${i.quantity}`:''}</strong><small>${i.kind==='potion'?`Hồi tối đa ${balance.potionHeal} HP`:i.kind==='armor'?`Giảm ${i.power} sát thương mỗi đòn`:weaponDescriptions[i.id as keyof typeof weaponDescriptions]}${equipped?' · ĐANG TRANG BỊ':''}</small></div><div>${i.kind==='potion'?`<button data-use="${g.inventory.filter(a=>a.kind==='potion').indexOf(i)}" ${g.player.hp===g.player.maxHp||g.recovering?'disabled':''}>Uống</button>`:`<button data-equip="${i.uid}" ${equipped||g.recovering?'disabled':''}>Trang bị</button>`}<button data-drop="${i.uid}" ${equipped||g.recovering?'disabled':''}>Bỏ</button></div></article>`
   }).join('')}</div><button id="close-bag" class="secondary">Đóng túi · I / Esc</button></div>`
 }
 export function campPanel(g:Game) {
@@ -25,5 +26,5 @@ export function campPanel(g:Game) {
   <button id="descend" ${g.chosenUpgrade?'':'disabled'}>Xuống tầng ${g.floor+1} →</button><p class="muted">${g.chosenUpgrade?'Nâng cấp đã nhận. HP, vàng, trang bị và kinh nghiệm được giữ khi xuống tầng.':'Chọn một nâng cấp để tiếp tục. Túi đầy thì bán đồ chưa trang bị để tạo chỗ trống.'}</p></div>`
 }
 export function endingPanel(g:Game) {
-  return `<div class="modal-content"><p class="eyebrow">${g.status==='dead'?'NGỌN LỬA ĐÃ TẮT':'PHÁO ĐÀI ĐÃ ĐƯỢC GIẢI THOÁT'}</p><h2>${g.status==='dead'?'Bóng tối thắng lần này.':'Bạn mang ánh lửa trở về.'}</h2><div class="run-stats"><span>Tầng <strong>${g.floor}/3</strong></span><span>Lượt <strong>${g.turn}</strong></span><span>Địch hạ <strong>${g.kills}</strong></span><span>Cấp <strong>${g.level}</strong></span><span>Vàng <strong>${g.gold}</strong></span></div><p>Chơi lại cùng seed để thử một lựa chọn trang bị và nâng cấp khác.</p><button id="continue">Bắt đầu hành trình mới →</button></div>`
+  return `<div class="modal-content"><p class="eyebrow">${g.status==='dead'?'NGỌN LỬA ĐÃ TẮT':'PHÁO ĐÀI ĐÃ ĐƯỢC GIẢI THOÁT'}</p><h2>${g.status==='dead'?'Bóng tối thắng lần này.':'Bạn mang ánh lửa trở về.'}</h2>${g.status==='dead'?`<p>Đòn kết liễu: ${g.deathReason}.</p>`:''}<div class="run-stats"><span>Tầng <strong>${g.floor}/3</strong></span><span>Lượt <strong>${g.turn}</strong></span><span>Địch hạ <strong>${g.kills}</strong></span><span>Cấp <strong>${g.level}</strong></span><span>Vàng <strong>${g.gold}</strong></span></div><p>Chơi lại cùng seed để thử một lựa chọn trang bị và nâng cấp khác.</p><button id="continue">Bắt đầu hành trình mới →</button></div>`
 }

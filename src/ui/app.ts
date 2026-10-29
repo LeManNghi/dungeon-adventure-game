@@ -1,3 +1,6 @@
+import { loadPreferences, savePreferences } from './preferences'
+import { GameAudio } from '../systems/audio'
+import { contextualHint, helpPanel } from './help'
 import { crops, files } from '../data/sprites'
 import { loadAssets } from '../render/assets'
 import type { Rect } from '../data/sprites'
@@ -15,6 +18,9 @@ export function startApp() {
   mountLayout()
   const $ = <T extends HTMLElement = HTMLElement>(selector: string) => document.querySelector<T>(selector)!
   const canvas = $<HTMLCanvasElement>('#game'), renderer = new Renderer(canvas)
+  const settings=loadPreferences(), audio=new GameAudio(settings)
+  renderer.reducedMotion=settings.reducedMotion
+  let helpOpen=false
   const params = new URLSearchParams(location.search)
   let currentSeed = normalizeSeed(params.get('seed') ?? 'tan-hoa-01')
   let currentScenario: 'arena' | 'dungeon' = params.get('scenario') === 'arena' ? 'arena' : 'dungeon'
@@ -54,11 +60,12 @@ export function startApp() {
     $('#scene-name').textContent = mode === 'combat' ? dungeon ? `01 / TẦNG ${game.floor} · ${game.board.name.toUpperCase()}` : '01 / PHÒNG LUYỆN TẬP' : mode === 'lab' ? `02 / ${labNames[fixtureIndex]}` : '03 / THƯ VIỆN ASSETS'
     $('#scene-state').textContent = !ready ? 'ĐANG TẢI ASSETS…' : mode === 'combat' ? `LƯỢT ${String(game.turn).padStart(3,'0')} · ${paused ? 'TẠM DỪNG' : game.status === 'playing' ? 'CHỜ BẠN HÀNH ĐỘNG' : game.status==='camp'?'ĐIỂM TIẾP TẾ':game.status==='victory'?'THÚ VƯƠNG ĐÃ GỤC':'KẾT THÚC'}` : mode === 'lab' ? fixtureIndex === 4 ? `SEED: ${currentSeed}` : 'MAP CỐ ĐỊNH · KHÔNG SƯƠNG MÙ' : `${files.length} PNG · PIXEL GỐC`
     $('#coords').textContent = mode === 'combat' ? `${p.x}, ${p.y}` : ''
-    $('#stage-hint').textContent = mode === 'combat' ? dungeon ? game.floor===3 ? 'Tìm điện nghi lễ và hạ Thú Vương. I mở túi; Shift + hướng để dùng tầm vũ khí.' : (game.exit && p.x === game.exit.x && p.y === game.exit.y ? 'Đã tới cầu thang. Nhấn E / Enter để tới điểm tiếp tế.' : 'Tìm cầu thang. Ô vàng báo bẫy; ô đỏ gây sát thương. Bình máu nhặt khi thiếu HP.') : 'Mỗi hành động là một lượt. Không có áp lực thời gian.' : mode === 'lab' ? 'Viền nằm trong ô tường. Cửa đóng và thùng chặn đường; cầu thang đi được.' : 'Khung nguồn và animation dùng đúng kích thước riêng của từng nhân vật.'
-﻿    const overlay = $('#overlay')
-    overlay.hidden = mode !== 'combat' || (!paused && !inventoryOpen && !['camp','dead','won'].includes(game.status))
+    $('#stage-hint').textContent = mode==='combat'?contextualHint(game):mode==='lab'?'Map inspector':'Asset inspector'
+    const overlay = $('#overlay')
+    overlay.hidden = (!helpOpen && mode !== 'combat') || (!helpOpen && !paused && !inventoryOpen && !['camp','dead','won'].includes(game.status))
     if (!overlay.hidden) {
-      if(game.status==='camp')overlay.innerHTML=campPanel(game)
+      if(helpOpen)overlay.innerHTML=helpPanel()
+      else if(game.status==='camp')overlay.innerHTML=campPanel(game)
       else if(inventoryOpen&&!paused)overlay.innerHTML=inventoryPanel(game)
       else if(paused&&game.status==='playing')overlay.innerHTML='<div class="modal-content"><p class="eyebrow">NGHỈ MỘT CHÚT</p><h2>Đợi bước tiếp theo.</h2><p>Thế giới đang chờ bạn.</p><button id="continue">Tiếp tục →</button></div>'
       else overlay.innerHTML=endingPanel(game)
@@ -81,6 +88,7 @@ export function startApp() {
       if (cropSelect) cropSelect.onchange = e => { cropName=(e.target as HTMLSelectElement).value; refresh() }
       $('#journal').innerHTML = `<p class="eyebrow">GHI CHÚ KIỂM KÊ</p><p class="muted">Player: 7 frame đi trước, 8 frame các hướng còn lại. Warrior: 12 frame trước/sau, 8 frame trái/phải. Monster và Boss: 4 frame mỗi hướng.</p><div class="tip"><strong>Boss có bộ hình riêng</strong><p>Chọn BossMonster và từng hướng để xem animation cùng điểm đặt chân. Boss xuất hiện ở đấu trường cuối tầng 3.</p></div>${cropName ? `<p class="muted">${cropLabels[cropName]}: [x, y, w, h] = ${(crops[cropName as keyof typeof crops]).join(', ')}</p>` : ''}`
     }
+    const closeHelp=$('#close-help');if(closeHelp)closeHelp.onclick=()=>{helpOpen=false;refresh();canvas.focus()}
     bindSeedControls(); bindPlayButtons()
   }
   function descend() {
@@ -102,7 +110,7 @@ export function startApp() {
   function restart() {
     window.clearTimeout(victoryTimer)
     game = new Game({ scenario:currentScenario,seed:currentSeed }); labGame=game.scenario==='dungeon'?game:new Game({scenario:'dungeon',seed:currentSeed})
-    inventoryOpen = false; paused = false; lockedUntil = 0; renderer.before.clear(); renderer.started=-1000; refresh(); canvas.focus()
+    helpOpen=false;inventoryOpen = false; paused = false; lockedUntil = 0; renderer.before.clear(); renderer.started=-1000; refresh(); canvas.focus()
   }
   function scheduleVictory() {
     if(game.status==='victory') {
@@ -111,9 +119,9 @@ export function startApp() {
     }
   }
   function act(action: Action) {
-    if (!ready || paused || mode !== 'combat' || performance.now() < lockedUntil || game.status !== 'playing') return
-    renderer.transition(game)
-    if (game.act(action)) lockedUntil = performance.now() + 185
+    if (!ready || helpOpen || paused || mode !== 'combat' || performance.now() < lockedUntil || game.status !== 'playing') return
+    const before=new Map([game.player,...game.enemies].map(a=>[a.id,{x:a.x,y:a.y}]))
+    if (game.act(action)) {renderer.before=before;renderer.started=performance.now();lockedUntil=performance.now()+185;audio.play(game.events)}
     scheduleVictory()
     inventoryOpen=false; refresh()
   }
@@ -126,6 +134,10 @@ export function startApp() {
   })
   for (const option of Object.keys(debug) as (keyof typeof debug)[]) $<HTMLInputElement>(`#${option}`).onchange = e => { debug[option]=(e.target as HTMLInputElement).checked }
   window.addEventListener('keydown', event => {
+    if(event.key==='Escape'&&helpOpen){event.preventDefault();helpOpen=false;refresh();canvas.focus();return}
+    if(event.key==='?'&&!event.repeat&&!(event.target instanceof HTMLInputElement)){event.preventDefault();helpOpen=!helpOpen;refresh();canvas.focus();return}
+    if(helpOpen)return
+    audio.unlock()
     if (event.target instanceof HTMLSelectElement || event.target instanceof HTMLInputElement || event.target instanceof HTMLButtonElement) return
     const moves: Record<string,[number,number]> = { w:[0,-1],ArrowUp:[0,-1],s:[0,1],ArrowDown:[0,1],a:[-1,0],ArrowLeft:[-1,0],d:[1,0],ArrowRight:[1,0] }
     const move=moves[event.key] ?? moves[event.key.toLowerCase()]
@@ -141,8 +153,20 @@ export function startApp() {
     else if (event.key === ' ' || event.key === '.') act({type:'wait'})
     else if (event.key.toLowerCase() === 'e' || event.key === 'Enter') act({type:'interact'})
   })
-  window.addEventListener('blur',()=> { if (mode === 'combat' && game.status === 'playing') { paused=true; refresh() } })
-  canvas.onpointerdown=()=>canvas.focus()
+  window.addEventListener('blur',()=> { audio.suspend();if (mode === 'combat' && game.status === 'playing') { paused=true; refresh() } })
+  canvas.onpointerdown=()=>{audio.unlock();canvas.focus()}
+  document.addEventListener('pointerdown',()=>audio.unlock())
+  document.addEventListener('visibilitychange',()=>{if(document.hidden){audio.suspend();if(game.status==='playing'){paused=true;refresh()}}})
+  $('#help').onclick=()=>{helpOpen=!helpOpen;refresh();canvas.focus()}
+  const sound=$<HTMLInputElement>('#sound'),volume=$<HTMLInputElement>('#volume'),motion=$<HTMLInputElement>('#motion')
+  sound.checked=settings.sound;volume.value=String(settings.volume*100);motion.checked=settings.reducedMotion
+  const saveSettings=()=>{settings.sound=sound.checked;settings.volume=Number(volume.value)/100;settings.reducedMotion=motion.checked;renderer.reducedMotion=settings.reducedMotion;savePreferences(settings);audio.update();audio.unlock()}
+  sound.onchange=saveSettings;volume.oninput=saveSettings;motion.onchange=saveSettings
+  $('#onboarding').hidden=settings.introduced
+  $('#dismiss-intro').onclick=()=>{settings.introduced=true;savePreferences(settings);$('#onboarding').hidden=true;canvas.focus()}
+  function resizeCanvas() {const width=canvas.parentElement!.clientWidth;const columns=Math.max(7,Math.floor(width/(width<600?32:48)));canvas.width=columns*48;canvas.height=(width<600?10:14)*48}
+  new ResizeObserver(resizeCanvas).observe(canvas.parentElement!)
+  window.addEventListener('resize',resizeCanvas);resizeCanvas()
   function frame(time: number) {
     if (ready) {
       if (mode === 'combat') renderer.combat(game,time,debug)

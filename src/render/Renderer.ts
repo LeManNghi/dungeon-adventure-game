@@ -11,9 +11,9 @@ export class Renderer {
   ctx: CanvasRenderingContext2D
   before = new Map<number, Point>()
   started = -1000
+  reducedMotion = false
   canvas: HTMLCanvasElement
   constructor(canvas: HTMLCanvasElement) { this.canvas = canvas; this.ctx = canvas.getContext('2d')! }
-  transition(game: Game) { this.before = new Map([game.player, ...game.enemies].map(a => [a.id, { x: a.x, y: a.y }])); this.started = performance.now() }
   reset() {
     this.ctx.setTransform(1, 0, 0, 1, 0, 0); this.ctx.imageSmoothingEnabled = false
     this.ctx.fillStyle = '#101216'; this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height)
@@ -70,7 +70,7 @@ export class Renderer {
   }
   combat(game: Game, time: number, debug: DebugOptions) {
     this.reset()
-    const ctx = this.ctx, progress = Math.min(1, Math.max(0, (time - this.started) / 180)), ease = 1 - (1 - progress) ** 3
+    const ctx = this.ctx, progress = Math.min(1, Math.max(0, (Math.max(0,time - this.started)) / 180)), ease = this.reducedMotion?1:1 - (1 - progress) ** 3
     const old = this.before.get(0) ?? game.player
     const camera = { x: (old.x + (game.player.x - old.x) * ease) * 16 + 8, y: (old.y + (game.player.y - old.y) * ease) * 16 + 8 }
     const scale = 3
@@ -91,7 +91,7 @@ export class Renderer {
         if (d.kind === 'barrel') continue
         if (d.kind === 'skull') sprite(ctx,'Map/Decorations_tileset.png',crops.skull,d.x*16,d.y*16)
         if (d.kind === 'torch') {
-          sprite(ctx,'Map/Torch.png',[0,Math.floor(time/140)%3*16,16,16],d.x*16,d.y*16)
+          sprite(ctx,'Map/Torch.png',[0,this.reducedMotion?0:Math.floor(time/140)%3*16,16,16],d.x*16,d.y*16)
           if (visible(d)) {
             const glow=ctx.createRadialGradient(d.x*16+8,d.y*16+10,1,d.x*16+8,d.y*16+10,30)
             glow.addColorStop(0,'#eea34530');glow.addColorStop(1,'#eea34500');ctx.fillStyle=glow;ctx.fillRect(d.x*16-22,d.y*16-20,60,60)
@@ -115,7 +115,7 @@ export class Renderer {
         ctx.fillStyle='#ed805226';ctx.beginPath();ctx.arc(item.x*16+8,item.y*16+8,9,0,Math.PI*2);ctx.fill()
         sprite(ctx,'Others/Others.png',[16,0,16,16],item.x*16,item.y*16)
       } else if(item.kind==='heal')sprite(ctx,'Others/HUD.png',crops.potion,item.x*16,item.y*16)
-      else if(item.kind==='gold')sprite(ctx,'Others/Coin.png',[0,Math.floor(time/120)%6*16,16,16],item.x*16,item.y*16)
+      else if(item.kind==='gold')sprite(ctx,'Others/Coin.png',[0,this.reducedMotion?0:Math.floor(time/120)%6*16,16,16],item.x*16,item.y*16)
       else {
         const color=item.tier===2?'#c48bf2':item.tier===1?'#e2be66':'#c4c6bb'
         ctx.fillStyle='#15171bbc';ctx.fillRect(item.x*16+2,item.y*16+2,12,12)
@@ -125,7 +125,7 @@ export class Renderer {
       }
     }
     for (const e of game.enemies.filter(e => e.hp > 0 && visible(e))) for (const p of e.intent.filter(visible)) {
-      ctx.fillStyle = `rgba(224,77,62,${.22 + Math.sin(time / 140) * .08})`; ctx.fillRect(p.x * 16, p.y * 16, 16, 16)
+      ctx.fillStyle = `rgba(224,77,62,${.22 + (this.reducedMotion?0:Math.sin(time / 140) * .08)})`; ctx.fillRect(p.x * 16, p.y * 16, 16, 16)
       ctx.strokeStyle = '#ff8d68'; ctx.lineWidth = .6; ctx.strokeRect(p.x * 16 + 1, p.y * 16 + 1, 14, 14)
       ctx.fillStyle = '#ffbf95'; ctx.font = 'bold 9px monospace'; ctx.fillText('!', p.x * 16 + 6, p.y * 16 + 11)
     }
@@ -137,27 +137,39 @@ export class Renderer {
     for (const entry of layered) {
       if(entry.type==='barrel') { sprite(ctx,'Map/Decorations_tileset.png',crops.barrel,entry.x*16,entry.y*16-8);continue }
       const a=entry.actor
-      const prev = this.before.get(a.id) ?? a, moving = progress < 1 && (prev.x !== a.x || prev.y !== a.y)
+      const prev = this.before.get(a.id) ?? a, moving = !this.reducedMotion && progress < 1 && (prev.x !== a.x || prev.y !== a.y)
       const x = (prev.x + (a.x - prev.x) * ease) * 16 + 8, y = (prev.y + (a.y - prev.y) * ease) * 16 + 15
       this.actor(a.kind, a.facing, x, y, time, moving)
+      if(a.kind==='player') {
+        const attacking=!this.reducedMotion&&progress<1&&game.events.some(e=>e.type==='attack')
+        const dx=a.facing==='left'?-1:a.facing==='right'?1:0,dy=a.facing==='back'?-1:a.facing==='front'?1:0
+        const reach=attacking?Math.sin(progress*Math.PI)*(game.weapon.id==='spear'?15:8):0
+        ctx.save();ctx.translate(x+dx*(6+reach),y-7+dy*(6+reach));ctx.rotate(a.facing==='left'?Math.PI:a.facing==='back'?-Math.PI/2:a.facing==='front'?Math.PI/2:0)
+        sprite(ctx,`Weapons/Weapons_${game.weapon.tier===2?'purple':game.weapon.tier===1?'gold':'normal'}_right.png`,game.weapon.id==='axe'?[59,48,32,16]:game.weapon.id==='spear'?[59,64,32,16]:crops.sword,-4,-4,16,8);ctx.restore()
+      }
+      if(!this.reducedMotion&&progress<1&&game.events.some(e=>e.type==='damage'&&e.x===a.x&&e.y===a.y)) {
+        ctx.strokeStyle='#ffe6bb';ctx.lineWidth=1;ctx.strokeRect(x-7,y-16,14,16)
+      }
       if(a.kind==='boss') {ctx.strokeStyle=a.enraged?'#ff4f3c':'#df9d60';ctx.lineWidth=.6;ctx.beginPath();ctx.ellipse(x,y,7,3,0,0,Math.PI*2);ctx.stroke()}
       if(a.kind==='ranger') {ctx.fillStyle='#efcb76';ctx.font='bold 5px monospace';ctx.fillText('N',x+6,y-10)}
       if (a.kind === 'player') { ctx.strokeStyle = '#e1bc78'; ctx.lineWidth = .6; ctx.beginPath(); ctx.ellipse(x, y, 6, 2, 0, 0, Math.PI * 2); ctx.stroke() }
       else this.enemyBar(a, x, y)
     }
-    if(game.status==='victory'&&game.boss) {
-      ctx.globalAlpha=Math.max(0,1-(time-this.started)/650)
-      this.actor('boss',game.boss.facing,game.boss.x*16+8,game.boss.y*16+15,time,false)
-      ctx.globalAlpha=1
+    if(!this.reducedMotion&&Math.max(0,time-this.started)<650)for(const e of game.events.filter(e=>e.type==='death'&&e.visible&&e.x!==undefined&&e.y!==undefined&&visible({x:e.x,y:e.y})&&e.kind)) {
+      ctx.globalAlpha=Math.max(0,1-(Math.max(0,time-this.started))/650)
+      this.actor(e.kind!,e.facing??'front',e.x!*16+8,e.y!*16+15,time,false);ctx.globalAlpha=1
     }
-    if (progress < 1 && game.hits.some(h => h.color === '#ffdb93')) {
+    if (!this.reducedMotion && progress < 1 && game.hits.some(h => h.color === '#ffdb93')) {
       const p = game.player, dx = p.facing === 'left' ? -1 : p.facing === 'right' ? 1 : 0, dy = p.facing === 'back' ? -1 : p.facing === 'front' ? 1 : 0
       ctx.strokeStyle = '#ffe3a7'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(p.x * 16 + 8 + dx * 10, p.y * 16 + 8 + dy * 10, 6, progress * 3, progress * 3 + 2); ctx.stroke()
     }
-    if (time - this.started < 650) {
-      ctx.globalAlpha = Math.max(0, 1 - (time - this.started) / 650)
-      for (const h of game.hits.filter(visible)) { ctx.font = 'bold 7px monospace'; ctx.fillStyle = h.color; ctx.fillText(h.value, h.x * 16 + 2, h.y * 16 - (time - this.started) / 55) }
+    if (Math.max(0,time - this.started) < 650) {
+      ctx.globalAlpha = Math.max(0, 1 - (Math.max(0,time - this.started)) / 650)
+      for (const h of game.hits.filter(visible)) { ctx.font = 'bold 7px monospace'; ctx.fillStyle = h.color; ctx.fillText(h.value, h.x * 16 + 2, h.y * 16 - (this.reducedMotion?0:(Math.max(0,time - this.started)) / 55)) }
       ctx.globalAlpha = 1
+    }
+    if(!this.reducedMotion&&Math.max(0,time-this.started)<450)for(const e of game.events.filter(e=>e.type==='pickup'&&e.x!==undefined&&e.y!==undefined)) {
+      const age=(Math.max(0,time-this.started))/450;ctx.globalAlpha=1-age;ctx.strokeStyle='#f1c97c';ctx.lineWidth=.8;ctx.beginPath();ctx.arc(e.x!*16+8,e.y!*16+8,3+age*10,0,Math.PI*2);ctx.stroke();ctx.globalAlpha=1
     }
   }
   fog(game: Game) {
@@ -169,7 +181,7 @@ export class Renderer {
     }
   }
   minimap(game: Game) {
-    const ctx=this.ctx, scale=3, left=this.canvas.width-game.board.width*scale-20, top=20
+    const ctx=this.ctx, scale=this.canvas.width<600?2:3, left=this.canvas.width-game.board.width*scale-20, top=game.bossActive||game.status==='victory'?this.canvas.height-game.board.height*scale-20:20
     ctx.fillStyle='#0b0e13ed';ctx.fillRect(left-8,top-8,game.board.width*scale+16,game.board.height*scale+16)
     for(let y=0;y<game.board.height;y++) for(let x=0;x<game.board.width;x++) {
       const id=`${x},${y}`
@@ -181,12 +193,12 @@ export class Renderer {
   }
   bossHud(game:Game) {
     const boss=game.boss;if(!boss)return
-    const ctx=this.ctx,x=40,y=22,w=610
+    const ctx=this.ctx,x=20,y=18,w=Math.min(610,this.canvas.width-40)
     ctx.fillStyle='#0d1116ed';ctx.fillRect(x-12,y-8,w+24,57)
     ctx.font='15px Segoe UI';ctx.fillStyle='#e8be89';ctx.fillText('THÚ VƯƠNG TÀN HỎA',x,y+10)
     const state=boss.intent.length?(boss.attackType==='charge'?'CHUẨN BỊ HÚC':'CHUẨN BỊ ĐẬP ĐẤT'):boss.recovery?'HỒI SỨC':boss.enraged?'CUỒNG NỘ':'ĐANG TIẾP CẬN'
-    ctx.font='11px Segoe UI';ctx.fillStyle='#e9977a';ctx.fillText(`${state} · ${boss.hp}/${boss.maxHp} HP`,x+300,y+10)
-    ctx.fillStyle='#392a29';ctx.fillRect(x,y+23,w,6);ctx.fillStyle=boss.enraged?'#e36f56':'#bd855e';ctx.fillRect(x,y+23,w*boss.hp/boss.maxHp,6)
+    ctx.font='11px Segoe UI';ctx.fillStyle='#e9977a';ctx.fillText(`${state} · ${boss.hp}/${boss.maxHp} HP`,x,y+25)
+    ctx.fillStyle='#392a29';ctx.fillRect(x,y+34,w,6);ctx.fillStyle=boss.enraged?'#e36f56':'#bd855e';ctx.fillRect(x,y+34,w*boss.hp/boss.maxHp,6)
   }
   enemyBar(a: Actor, x: number, y: number) {
     const ctx = this.ctx, top = y - (a.kind === 'warrior' ? 25 : 19)
@@ -195,7 +207,7 @@ export class Renderer {
     if (a.recovery) { ctx.font = '5px monospace'; ctx.fillStyle = '#a2d7d2'; ctx.fillText('Z', x + 7, y - 19) }
   }
   lab(board: Board, debug: DebugOptions, game?: Game, time = 0) {
-    const scale=Math.min(2,Math.floor(Math.min(this.canvas.width/(board.width*16),this.canvas.height/(board.height*16)))) || 1
+    const scale=Math.min(2,this.canvas.width/(board.width*16),this.canvas.height/(board.height*16))
     this.reset(); this.ctx.scale(scale, scale)
     this.ctx.translate((this.canvas.width / scale - board.width * 16) / 2, (this.canvas.height / scale - board.height * 16) / 2)
     this.board(board, debug)
@@ -206,6 +218,8 @@ export class Renderer {
   }
   asset(path: string, time: number, grid: boolean, selectedCrop?: Rect) {
     this.reset()
+    const fit=Math.min(this.canvas.width/960,this.canvas.height/672)
+    this.ctx.translate((this.canvas.width-960*fit)/2,(this.canvas.height-672*fit)/2);this.ctx.scale(fit,fit)
     const img = images.get(path)!, ctx = this.ctx, scale = Math.min(4, Math.floor(850 / img.width), Math.floor(540 / img.height)) || 1, x = 48, y = 65
     for (let yy = 0; yy < img.height * scale; yy += 16) for (let xx = 0; xx < img.width * scale; xx += 16) {
       ctx.fillStyle = ((xx + yy) / 16) % 2 ? '#2c2d33' : '#23252a'; ctx.fillRect(x + xx, y + yy, Math.min(16, img.width * scale - xx), Math.min(16, img.height * scale - yy))

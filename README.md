@@ -15,16 +15,6 @@ Mỗi bước đi là một quyết định. Quan sát ý định của kẻ đ�
 - Điểm tiếp tế giữa tầng cho phép mua đồ bằng vàng và chọn nâng cấp cho hành trình.
 - Boss Thú Vương Tàn Hỏa có đòn húc, đập đất và giai đoạn cuồng nộ với tín hiệu báo trước.
 - Chết sẽ kết thúc lượt chơi; bạn có thể thử lại cùng hầm ngục hoặc khám phá một seed mới.
+- Cẩm nang trong game, cảnh báo nguy hiểm theo tình huống và âm thanh có thể tùy chỉnh.
 
 Hành trình diễn ra qua ba tầng hầm ngục, từ khu canh gác đến điện nghi lễ. Hãy tìm cầu thang, lựa chọn giao chiến hoặc vượt qua kẻ địch, rồi đối đầu Thú Vương để mang ánh lửa trở lại pháo đài.
-
-## Chạy dự án
-
-Khuyến nghị Node.js 22.15 trở lên. Cài dependency bằng `npm install` khi cần.
-
-```sh
-npm run dev
-npm run build
-npm test
-npm run playtest
-```

@@ -1,10 +1,10 @@
-﻿import { arena } from '../world/fixtures'
+import { arena } from '../world/fixtures'
 import { distance, key, same, setTile, tile, walkable } from '../world/tiles'
 import type { Board, Point } from '../world/tiles'
 import { fieldOfView } from '../world/visibility'
 import { generateDungeon, inRoom } from '../world/dungeon'
 import type { BossArena, Decoration, Loot, Room, Trap } from '../world/dungeon'
-import type { Actor, Hit, Action, GameOptions } from './types'
+import type { Actor, Hit, Action, GameOptions, GameEvent } from './types'
 import { makeEnemy, enemyNames } from '../data/enemies'
 import { makeItem, shopOffers } from '../data/items'
 import type { Item, WeaponKind } from '../data/items'
@@ -13,6 +13,7 @@ import type { UpgradeId } from '../data/upgrades'
 import { storeItem } from '../systems/inventory'
 import { weaponArea } from '../systems/combat'
 import { face, takeEnemyTurn } from '../systems/enemies'
+import { balance } from '../data/balance'
 
 export class Game {
   board: Board = arena()
@@ -53,6 +54,8 @@ export class Game {
   explored = new Set<string>()
   exit?: Point
   log: string[] = []
+  events: GameEvent[] = []
+  deathReason = ''
   hits: Hit[] = []
   constructor(options: GameOptions = {}) {
     this.scenario=options.scenario??'arena'
@@ -75,7 +78,7 @@ export class Game {
     this.exit=d.exit;this.traps=d.traps;this.loot=d.loot;this.decorations=d.decorations
     this.enemies=d.enemies.map((e,i)=>makeEnemy(e.kind,i+1,e.x,e.y,number))
     this.bossArena=d.bossArena;this.bossActive=false;this.bossDefeated=false
-    this.visible.clear();this.explored.clear();this.visitedRooms.clear();this.hits=[]
+    this.visible.clear();this.explored.clear();this.visitedRooms.clear();this.hits=[];this.events=[]
     this.floorTurn=0;this.recovering=false;this.charged=0;this.status='playing'
     this.enterRoom();this.updateVision();this.message(`Tầng ${number}: ${d.board.name}.`)
   }
@@ -90,7 +93,8 @@ export class Game {
   }
   canSee(p:Point) {return this.visible.has(key(p))}
   message(text:string) {this.log.unshift(text);this.log=this.log.slice(0,12)}
-  damage(target:Actor,raw:number) {
+  emit(event:GameEvent) {this.events.push(event)}
+  damage(target:Actor,raw:number,source='Đòn đánh của địch') {
     if(target.hp<=0)return
     let amount=raw
     if(target===this.player) {
@@ -98,8 +102,11 @@ export class Game {
       const absorbed=Math.min(this.shield,amount);this.shield-=absorbed;amount-=absorbed
     }
     target.hp=Math.max(0,target.hp-amount)
+    this.emit({type:'damage',x:target.x,y:target.y,kind:target.kind,visible:target===this.player||this.canSee(target)})
+    if(target===this.player) {this.message(`${source}: ${amount?`−${amount} HP`:'đã được chắn'}.`);if(!target.hp)this.deathReason=source}
     this.hits.push({x:target.x,y:target.y,value:amount?`−${amount}`:'CHẮN',color:target===this.player?'#ff7470':'#ffdb93'})
     if(target.hp>0)return
+    this.emit({type:'death',x:target.x,y:target.y,kind:target.kind,visible:target===this.player||this.canSee(target),facing:target.facing})
     target.intent=[];target.attackType=undefined
     this.message(`${enemyNames[target.kind]} đã gục ngã.`)
     if(target===this.player)return
@@ -109,27 +116,28 @@ export class Game {
     this.xp+=target.kind==='boss'?25:target.kind==='monster'?4:7
     while(this.xp>=this.xpToNext) {
       this.xp-=this.xpToNext;this.level++;this.player.maxHp+=4;if(this.player.hp>0)this.player.hp=Math.min(this.player.maxHp,this.player.hp+4)
-      this.message(`Lên cấp ${this.level}! +1 sát thương, +4 HP tối đa.`)
+      this.emit({type:'level'});this.message(`Lên cấp ${this.level}! +1 sát thương, +4 HP tối đa.`)
     }
-    if(this.upgradeStacks.blood&&this.player.hp>0)this.player.hp=Math.min(this.player.maxHp,this.player.hp+3*this.upgradeStacks.blood)
+    if(this.upgradeStacks.blood&&this.player.hp>0)this.player.hp=Math.min(this.player.maxHp,this.player.hp+balance.bloodHeal*this.upgradeStacks.blood)
     if(target.kind==='boss') {
       this.bossDefeated=true;this.bossActive=false
       for(const p of this.bossArena?.gates??[])setTile(this.board,p.x,p.y,'.')
-      this.status='victory';this.message('Thú Vương đã bị đánh bại. Ngọn lửa trở lại pháo đài!')
+      this.emit({type:'victory'});this.status='victory';this.message('Thú Vương đã bị đánh bại. Ngọn lửa trở lại pháo đài!')
     }
   }
   pickup() {
     const item=this.loot.find(l=>same(l,this.player))
     if(!item)return
     if(item.kind==='ember') {
-      this.embers++;this.emberFound=true;this.player.hp=Math.min(this.player.maxHp,this.player.hp+8)
-      this.message('Nhận Tàn hỏa: +1 sát thương và hồi tối đa 8 HP!')
-    } else if(item.kind==='gold') {this.gold+=12;this.message('Nhặt 12 vàng.')}
+      this.embers++;this.emberFound=true;this.player.hp=Math.min(this.player.maxHp,this.player.hp+balance.emberHeal)
+      this.message(`Nhận Tàn hỏa: +1 sát thương và hồi tối đa ${balance.emberHeal} HP!`)
+    } else if(item.kind==='gold') {this.gold+=balance.goldPickup;this.message(`Nhặt ${balance.goldPickup} vàng.`)}
     else {
       const gear=makeItem(item.kind==='heal'?'potion':item.itemId??'sword',item.tier??0,this.serial++)
       if(!storeItem(this.inventory,gear)) {this.message('Túi đầy. Bỏ một món chưa trang bị để nhặt đồ mới.');return}
       this.message(`Nhặt ${gear.name}. ${gear.kind==='potion'?'Phím 1–3 để dùng.':'Mở túi I để trang bị.'}`)
     }
+    this.emit({type:'pickup',x:item.x,y:item.y,visible:true})
     this.loot=this.loot.filter(l=>l!==item)
   }
   enterRoom() {
@@ -176,7 +184,7 @@ export class Game {
   trapTurn() {
     for(const trap of this.traps) {
       if(trap.phase===1||trap.phase===2)for(const a of [this.player,...this.enemies].filter(a=>a.hp>0&&same(a,trap))) {
-        this.damage(a,5);if(a===this.player||this.canSee(trap))this.message(`${enemyNames[a.kind]} trúng bẫy gai.`)
+        this.damage(a,5,'Bẫy gai');if(a===this.player||this.canSee(trap))this.message(`${enemyNames[a.kind]} trúng bẫy gai.`)
       }
       trap.phase=(trap.phase+1)%3
     }
@@ -186,6 +194,7 @@ export class Game {
     let targets=area.map(p=>this.enemies.find(e=>e.hp>0&&same(e,p))).filter((e):e is Actor=>Boolean(e))
     if(kind!=='axe')targets=targets.slice(0,1)
     if(!targets.length)return false
+    this.emit({type:'attack',x:this.player.x,y:this.player.y,visible:true})
     this.player.facing=face(dx,dy)
     const amount=this.attack+this.charged;this.charged=0
     for(const e of targets)this.damage(e,amount)
@@ -196,19 +205,20 @@ export class Game {
     if(this.status!=='playing')return false
     if(this.recovering&&action.type!=='wait') {this.message('Rìu cần hồi sức. Nhấn Space để chờ một lượt.');return false}
     if(action.type==='interact'&&!(this.scenario==='dungeon'&&this.floor<3&&tile(this.board,this.player.x,this.player.y)==='>'))return false
-    this.hits=[]
+    this.hits=[];this.events=[]
     if(action.type==='move'||action.type==='attack') {
       if(Math.abs(action.dx)+Math.abs(action.dy)!==1)return false
       this.player.facing=face(action.dx,action.dy)
       const p={x:this.player.x+action.dx,y:this.player.y+action.dy}
       if(action.type==='attack'||this.enemies.some(e=>e.hp>0&&same(e,p))) {if(!this.playerAttack(action.dx,action.dy))return false}
-      else if(walkable(this.board,p.x,p.y)) {Object.assign(this.player,p);this.pickup();this.enterRoom()}
+      else if(walkable(this.board,p.x,p.y)) {Object.assign(this.player,p);this.emit({type:'step'});this.pickup();this.enterRoom()}
       else return false
     } else if(action.type==='equip') {
       const item=this.inventory.find(i=>i.uid===action.uid)
       if(!item||item.kind==='potion'||this.weaponUid===item.uid||this.armorUid===item.uid)return false
       if(item.kind==='weapon')this.weaponUid=item.uid;else this.armorUid=item.uid
       this.message(`Trang bị ${item.name}.`)
+      this.emit({type:'equip'})
     } else if(action.type==='drop') {
       const item=this.inventory.find(i=>i.uid===action.uid)
       if(!item||this.weaponUid===item.uid||this.armorUid===item.uid||this.loot.some(l=>same(l,this.player)))return false
@@ -217,9 +227,11 @@ export class Game {
     } else if(action.type==='use') {
       const potion=this.inventory.filter(i=>i.kind==='potion')[action.slot]
       if(!Number.isInteger(action.slot)||action.slot<0||!potion||this.player.hp===this.player.maxHp)return false
-      const healed=Math.min(12,this.player.maxHp-this.player.hp);this.player.hp+=healed;potion.quantity--
+      const healed=Math.min(balance.potionHeal,this.player.maxHp-this.player.hp);this.player.hp+=healed;potion.quantity--
       if(!potion.quantity)this.inventory=this.inventory.filter(i=>i!==potion)
       this.message(`Uống bình máu: +${healed} HP.`)
+      this.emit({type:'heal',x:this.player.x,y:this.player.y,visible:true})
+      this.hits.push({x:this.player.x,y:this.player.y,value:`+${healed}`,color:'#8fe2ae'})
     } else if(action.type==='wait') {
       this.recovering=false;this.pickup();this.charged=3*this.upgradeStacks.patience
     }
