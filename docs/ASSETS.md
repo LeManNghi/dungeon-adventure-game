@@ -2,7 +2,7 @@
 
 ## Dữ liệu nguồn
 
-`src/asset-manifest.json` ghi kích thước thực của 38 PNG, sinh bằng `npm run assets:scan`. `src/assets.ts` khai báo đường dẫn animation, frame, điểm đặt chân và vùng cắt. Renderer kiểm tra ảnh tải về khớp manifest.
+`src/data/asset-manifest.json` ghi kích thước thực của 38 PNG, sinh bằng `npm run assets:scan`. `src/data/sprites.ts` khai báo đường dẫn animation, frame, điểm đặt chân và vùng cắt. `src/render/assets.ts` tải ảnh và kiểm tra kích thước khớp manifest.
 
 Các tọa độ dưới đây dùng pixel nguồn, gốc trên trái. Ảnh được phóng bằng nearest-neighbor.
 
@@ -38,6 +38,7 @@ Các tọa độ dưới đây dùng pixel nguồn, gốc trên trái. Ảnh đ�
 | Đầu lâu | Decorations_tileset | [64,0,16,16] | Trang trí, đi được |
 | Đồng xu frame đầu | Coin | [0,0,16,16] | Chưa có cơ chế nhặt |
 | Tim đầy | HUD | [0,0,16,16] | Biểu tượng giao diện |
+| Bình hồi máu đỏ | HUD | [48,16,16,16] | Nhặt khi thiếu HP |
 | Kiếm ngang | Weapons_normal_right | [59,80,32,16] | Vùng hình tham chiếu; combat dùng hiệu ứng chém Canvas |
 
 HUD (80×80), Others (64×64), Sheet/DamagedSheet (64×64) và các bộ vũ khí được giữ nguyên. Weapons trái/phải có canvas 100×125, hướng lên 64×80; không chia đều theo kích thước canvas để giả định frame. Chưa gán toàn bộ các mảnh vũ khí vào gameplay mốc 2.
@@ -53,7 +54,7 @@ Bộ tileset gốc chứa nhiều mảng kiến trúc, không có sẵn bộ aut
 5. Mọi tổ hợp tám ô lân cận đều có biểu diễn bằng các dải viền. Cột độc lập và tường mỏng dùng cùng quy tắc.
 6. Ô ngoài biên được coi là tường để kiểm tra đi lại. Fixture biên cố ý cho sàn chạm mép để kiểm tra renderer, không phải bố cục dungeon cuối cùng.
 
-Giới hạn: vòm cửa lớn, cầu thang chéo và mảng tường rêu không dùng cho ghép tự động hiện tại. Cửa đóng trong map mẫu là hình tạm Canvas, chặn đường; chưa có hành động mở cửa ở mốc 2. Khi thêm dungeon ở mốc 3 cần giữ một vòng tường bao và kiểm tra kết nối sau khi đặt cửa/trang trí.
+Giới hạn: vòm cửa lớn, cầu thang chéo và mảng tường rêu không dùng cho ghép tự động hiện tại. Cửa đóng trong map mẫu là hình tạm Canvas, chặn đường; chưa có hành động mở cửa. Dungeon mốc 3 giữ một vòng tường bao, phân biệt thùng cản đường với trang trí và kiểm tra kết nối sau khi đặt vật thể.
 
 ## Kiểm chứng mốc 1–2
 
@@ -63,4 +64,8 @@ Giới hạn: vòm cửa lớn, cầu thang chéo và mảng tường rêu khôn
 - Đã xem ảnh chụp phòng chiến đấu, bốn map mẫu và preview Boss. Các viền không tráo vai trò trong những bố cục đã kiểm tra.
 - Kết quả giao diện: `browser-qa-result.html`. Ảnh: `arena-preview.png`, `lab-*.png`, `boss-preview.png`. `tileset-grid.png` là atlas tham chiếu có đánh lưới 16 px, không dùng để cắt tự động.
 
-Đây là kiểm chứng cho phòng cố định và fixture; chưa kiểm chứng map ngẫu nhiên vì mốc 3 chưa triển khai.
+Các kết quả trên chỉ kiểm chứng phòng cố định và fixture ở mốc 1–2, trước khi triển khai map ngẫu nhiên.
+
+## Mốc 3 và tổ chức mã nguồn
+
+Dữ liệu sprite ở `src/data/`, tải ảnh và Canvas ở `src/render/`. Quy tắc cạnh/góc ở `src/world/tiles.ts`; sinh dungeon ở `src/world/dungeon.ts`; FOV ở `src/world/visibility.ts`. Đã kiểm tra logic trên 1.000 seed và QA trình duyệt 47/47 mục. Đã kiểm tra ảnh bốn seed, trước/sau trang trí và có sương mù; chi tiết tại [QA-MILESTONE-3.md](QA-MILESTONE-3.md). Thùng chưa khám phá không được vẽ để tránh phần hình cao hơn ô làm lộ vật thể qua ranh giới sương mù.

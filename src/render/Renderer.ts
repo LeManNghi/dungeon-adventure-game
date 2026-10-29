@@ -1,10 +1,12 @@
-import { actorMeta, actorSheet, crops, images, sprite } from './assets'
-import type { ActorKind, Direction, Rect } from './assets'
-import type { Actor, Game } from './game'
-import { floor, tile, wallShape } from './world'
-import type { Board, Point } from './world'
+import { actorMeta, actorSheet, crops } from '../data/sprites'
+import { images, sprite } from './assets'
+import type { ActorKind, Direction, Rect } from '../data/sprites'
+import type { Game } from '../game/Game'
+import type { Actor } from '../game/types'
+import { floor, floorVariant, tile, walkable, wallShape } from '../world/tiles'
+import type { Board, Point } from '../world/tiles'
 const atlas = 'Map/Map_tileset.png'
-export type DebugOptions = { grid: boolean; ids: boolean; collision: boolean }
+export type DebugOptions = { grid: boolean; ids: boolean; collision: boolean; reveal?: boolean; decorations?: boolean; labFog?: boolean }
 export class Renderer {
   ctx: CanvasRenderingContext2D
   before = new Map<number, Point>()
@@ -19,7 +21,7 @@ export class Renderer {
   drawTile(board: Board, x: number, y: number) {
     const ctx = this.ctx, px = x * 16, py = y * 16, t = tile(board, x, y)
     if (floor(board, x, y) || t === '+') {
-      const v = (x * 31 + y * 17) % 13
+      const v = floorVariant(board, x, y)
       sprite(ctx, atlas, v === 0 ? crops.floorCrack : v < 3 ? crops.floorDust : crops.floor, px, py)
       if (t === '>') sprite(ctx, atlas, crops.stairs, px, py)
       if (t === '+') {
@@ -49,7 +51,7 @@ export class Renderer {
     for (let y = 0; y < board.height; y++) for (let x = 0; x < board.width; x++) this.drawTile(board, x, y)
     const ctx = this.ctx
     for (let y = 0; y < board.height; y++) for (let x = 0; x < board.width; x++) {
-      const solid = !floor(board, x, y)
+      const solid = !walkable(board, x, y)
       if (debug.collision && solid) { ctx.fillStyle = '#d952773d'; ctx.fillRect(x * 16, y * 16, 16, 16) }
       if (debug.grid) { ctx.strokeStyle = '#cfdecd40'; ctx.lineWidth = .3; ctx.strokeRect(x * 16, y * 16, 16, 16) }
       if (debug.ids) {
@@ -73,19 +75,57 @@ export class Renderer {
     const ox = Math.max(this.canvas.width / scale - game.board.width * 16, Math.min(0, this.canvas.width / scale / 2 - camera.x))
     const oy = Math.max(this.canvas.height / scale - game.board.height * 16, Math.min(0, this.canvas.height / scale / 2 - camera.y))
     ctx.scale(scale, scale); ctx.translate(Math.round(ox), Math.round(oy)); this.board(game.board, { ...debug, ids: false })
-    sprite(ctx, 'Map/Decorations_tileset.png', crops.skull, 3 * 16, 3 * 16)
-    for (const x of [5, 13, 21]) {
-      sprite(ctx, 'Map/Torch.png', [0, Math.floor(time / 140) % 3 * 16, 16, 16], x * 16, 16)
-      const glow = ctx.createRadialGradient(x * 16 + 8, 30, 1, x * 16 + 8, 30, 35)
-      glow.addColorStop(0, '#eea34525'); glow.addColorStop(1, '#eea34500'); ctx.fillStyle = glow; ctx.fillRect(x * 16 - 28, 0, 72, 65)
+    this.dynamics(game,time,debug,Boolean(debug.reveal),ease,progress)
+    if (game.scenario === 'dungeon' && !debug.reveal) this.fog(game)
+    ctx.setTransform(1,0,0,1,0,0)
+    if (game.scenario === 'dungeon') this.minimap(game)
+  }
+  dynamics(game: Game, time: number, debug: DebugOptions, reveal: boolean, ease = 1, progress = 1) {
+    const ctx = this.ctx, visible = (p: Point) => reveal || game.canSee(p)
+    if (debug.decorations !== false) {
+      const decor = game.scenario === 'arena' ? [{ x:3,y:3,kind:'skull' },...[5,13,21].map(x=>({x,y:1,kind:'torch'}))] : game.decorations
+      for (const d of decor) {
+        if (d.kind === 'barrel') continue
+        if (d.kind === 'skull') sprite(ctx,'Map/Decorations_tileset.png',crops.skull,d.x*16,d.y*16)
+        if (d.kind === 'torch') {
+          sprite(ctx,'Map/Torch.png',[0,Math.floor(time/140)%3*16,16,16],d.x*16,d.y*16)
+          if (visible(d)) {
+            const glow=ctx.createRadialGradient(d.x*16+8,d.y*16+10,1,d.x*16+8,d.y*16+10,30)
+            glow.addColorStop(0,'#eea34530');glow.addColorStop(1,'#eea34500');ctx.fillStyle=glow;ctx.fillRect(d.x*16-22,d.y*16-20,60,60)
+          }
+        }
+      }
     }
-    for (const e of game.enemies.filter(e => e.hp > 0)) for (const p of e.intent) {
+    for (const trap of game.traps) {
+      const seen = visible(trap)
+      if (!seen && !game.explored.has(`${trap.x},${trap.y}`)) continue
+      const phase = seen ? trap.phase : 0
+      sprite(ctx,'Map/Spike.png',[0,(phase === 2 ? 3 : phase)*16,16,16],trap.x*16,trap.y*16)
+      if (phase) {
+        ctx.fillStyle=phase===1?'#dca24135':'#e44e4e40';ctx.fillRect(trap.x*16,trap.y*16,16,16)
+        ctx.strokeStyle=phase===1?'#edba5f':'#fa7562';ctx.lineWidth=.7;ctx.strokeRect(trap.x*16+1,trap.y*16+1,14,14)
+        ctx.fillStyle=phase===1?'#ffe4aa':'#ffa49a';ctx.font='bold 7px monospace';ctx.fillText(phase===1?'!':'×',trap.x*16+6,trap.y*16+10)
+      }
+    }
+    for (const item of game.loot.filter(visible)) {
+      if (item.kind==='ember') {
+        ctx.fillStyle='#ed805226';ctx.beginPath();ctx.arc(item.x*16+8,item.y*16+8,9,0,Math.PI*2);ctx.fill()
+        sprite(ctx,'Others/Others.png',[16,0,16,16],item.x*16,item.y*16)
+      } else sprite(ctx,'Others/HUD.png',crops.potion,item.x*16,item.y*16)
+    }
+    for (const e of game.enemies.filter(e => e.hp > 0 && visible(e))) for (const p of e.intent.filter(visible)) {
       ctx.fillStyle = `rgba(224,77,62,${.22 + Math.sin(time / 140) * .08})`; ctx.fillRect(p.x * 16, p.y * 16, 16, 16)
       ctx.strokeStyle = '#ff8d68'; ctx.lineWidth = .6; ctx.strokeRect(p.x * 16 + 1, p.y * 16 + 1, 14, 14)
       ctx.fillStyle = '#ffbf95'; ctx.font = 'bold 9px monospace'; ctx.fillText('!', p.x * 16 + 6, p.y * 16 + 11)
     }
-    const actors = [game.player, ...game.enemies].filter(a => a.hp > 0).sort((a, b) => a.y - b.y)
-    for (const a of actors) {
+    const actors = [game.player, ...game.enemies].filter(a => a.hp > 0 && visible(a))
+    const layered: ({type:'actor'; y:number; actor:Actor} | {type:'barrel'; y:number; x:number})[] = actors.map(actor=>({type:'actor', y:actor.y,actor}))
+    // Barrels retain a visible silhouette even when decorative details are disabled.
+    for(const d of game.decorations.filter(d=>d.kind==='barrel' && (reveal || game.explored.has(`${d.x},${d.y}`)))) layered.push({type:'barrel',x:d.x,y:d.y})
+    layered.sort((a,b)=>a.y-b.y)
+    for (const entry of layered) {
+      if(entry.type==='barrel') { sprite(ctx,'Map/Decorations_tileset.png',crops.barrel,entry.x*16,entry.y*16-8);continue }
+      const a=entry.actor
       const prev = this.before.get(a.id) ?? a, moving = progress < 1 && (prev.x !== a.x || prev.y !== a.y)
       const x = (prev.x + (a.x - prev.x) * ease) * 16 + 8, y = (prev.y + (a.y - prev.y) * ease) * 16 + 15
       this.actor(a.kind, a.facing, x, y, time, moving)
@@ -98,9 +138,28 @@ export class Renderer {
     }
     if (time - this.started < 650) {
       ctx.globalAlpha = Math.max(0, 1 - (time - this.started) / 650)
-      for (const h of game.hits) { ctx.font = 'bold 7px monospace'; ctx.fillStyle = h.color; ctx.fillText(h.value, h.x * 16 + 2, h.y * 16 - (time - this.started) / 55) }
+      for (const h of game.hits.filter(visible)) { ctx.font = 'bold 7px monospace'; ctx.fillStyle = h.color; ctx.fillText(h.value, h.x * 16 + 2, h.y * 16 - (time - this.started) / 55) }
       ctx.globalAlpha = 1
     }
+  }
+  fog(game: Game) {
+    const ctx=this.ctx
+    for(let y=0;y<game.board.height;y++) for(let x=0;x<game.board.width;x++) {
+      const id=`${x},${y}`
+      if(game.visible.has(id)) continue
+      ctx.fillStyle=game.explored.has(id)?'#080b10d9':'#0b0e13';ctx.fillRect(x*16,y*16,16,16)
+    }
+  }
+  minimap(game: Game) {
+    const ctx=this.ctx, scale=3, left=this.canvas.width-game.board.width*scale-20, top=20
+    ctx.fillStyle='#0b0e13ed';ctx.fillRect(left-8,top-8,game.board.width*scale+16,game.board.height*scale+16)
+    for(let y=0;y<game.board.height;y++) for(let x=0;x<game.board.width;x++) {
+      const id=`${x},${y}`
+      if(!game.explored.has(id)) continue
+      ctx.fillStyle=tile(game.board,x,y)==='>'?'#f0c775':walkable(game.board,x,y)?(game.visible.has(id)?'#9f9a7b':'#454b4e'):'#282e32'
+      ctx.fillRect(left+x*scale,top+y*scale,scale,scale)
+    }
+    ctx.fillStyle='#f2d8a1';ctx.fillRect(left+game.player.x*scale-1,top+game.player.y*scale-1,5,5)
   }
   enemyBar(a: Actor, x: number, y: number) {
     const ctx = this.ctx, top = y - (a.kind === 'warrior' ? 25 : 19)
@@ -108,10 +167,15 @@ export class Renderer {
     ctx.fillStyle = a.intent.length ? '#ffb477' : '#c56a59'; ctx.fillRect(x - 7, top, 14 * a.hp / a.maxHp, 2)
     if (a.recovery) { ctx.font = '5px monospace'; ctx.fillStyle = '#a2d7d2'; ctx.fillText('Z', x + 7, y - 19) }
   }
-  lab(board: Board, debug: DebugOptions) {
-    this.reset(); this.ctx.scale(2, 2)
-    this.ctx.translate((this.canvas.width / 2 - board.width * 16) / 2, (this.canvas.height / 2 - board.height * 16) / 2)
+  lab(board: Board, debug: DebugOptions, game?: Game, time = 0) {
+    const scale=Math.min(2,Math.floor(Math.min(this.canvas.width/(board.width*16),this.canvas.height/(board.height*16)))) || 1
+    this.reset(); this.ctx.scale(scale, scale)
+    this.ctx.translate((this.canvas.width / scale - board.width * 16) / 2, (this.canvas.height / scale - board.height * 16) / 2)
     this.board(board, debug)
+    if(game) {
+      this.dynamics(game,time,debug,!debug.labFog)
+      if(debug.labFog) this.fog(game)
+    }
   }
   asset(path: string, time: number, grid: boolean, selectedCrop?: Rect) {
     this.reset()

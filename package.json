@@ -5,10 +5,11 @@
   "type": "module",
   "scripts": {
     "assets:scan": "node tools/inventory.mjs",
-    "test": "node --test tools/game.test.mjs",
+    "test": "node --test tests/unit/game.test.mjs tests/unit/dungeon.test.mjs",
     "dev": "vite",
     "build": "tsc && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "playtest": "node tools/playtest.mjs"
   },
   "devDependencies": {
     "typescript": "~7.0.2",

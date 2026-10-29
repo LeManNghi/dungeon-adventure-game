@@ -159,42 +159,42 @@ Sử dụng bộ khung Vite + TypeScript hiện có. Đề xuất Canvas 2D cho 
 
 Tách trạng thái và luật game khỏi renderer: animation không quyết định sát thương hoặc số lượt. Tọa độ logic là ô lưới; tọa độ hiển thị có thể nội suy giữa hai ô.
 
-Cấu trúc dự kiến, có thể điều chỉnh khi triển khai:
+Cấu trúc đang dùng, đã tách module khi triển khai mốc 3:
 
 ```text
 src/
-  main.ts
+  main.ts                 # Chỉ khởi động ứng dụng
+  style.css
   game/
-    Game.ts
-    state.ts
-    actions.ts
-    turns.ts
+    Game.ts               # Trạng thái, hành động và thứ tự lượt
+    types.ts              # Actor, action, hit và cấu hình game
   world/
-    dungeon.ts
-    tiles.ts
-    fov.ts
-    pathfinding.ts
-  entities/
-    player.ts
-    enemies.ts
-  systems/
-    combat.ts
-    inventory.ts
-    progression.ts
+    tiles.ts              # Lưới, va chạm và phân loại góc/cạnh
+    dungeon.ts            # Sinh phòng, hành lang, đặt vật thể, kiểm tra map
+    random.ts             # Chuẩn hóa seed và bộ sinh số ngẫu nhiên
+    visibility.ts         # Đường nhìn, FOV
+    pathfinding.ts        # Tìm đường và kiểm tra kết nối
+    fixtures.ts           # Phòng luyện tập và các map kiểm tra cố định
   render/
-    renderer.ts
-    camera.ts
-    animations.ts
-    assets.ts
+    Renderer.ts           # Canvas, camera, animation, fog và minimap
+    assets.ts             # Tải/giải mã ảnh và vẽ vùng sprite
   data/
-    sprites.ts
-    enemies.ts
-    items.ts
+    sprites.ts            # Frame, vùng cắt và điểm đặt chân
+    asset-manifest.json   # Kích thước PNG thực tế
   ui/
-    hud.ts
-    inventory.ts
-    menus.ts
+    app.ts                # Điều phối UI, bàn phím, seed và các tab
+    layout.ts             # Khung HTML
+public/assets/            # Ảnh gốc
+tests/                    # Xem các thư mục con bên dưới
 ```
+
+- `tests/unit/`: kiểm tra luật game, dungeon và dữ liệu.
+- `tests/helpers/`: nạp module TypeScript thuần cho Node.
+- `tests/browser/`: QA giao diện và tuyến chơi lại bằng bàn phím.
+- `tools/`: script kiểm kê assets, mô phỏng chơi và chạy Chrome QA.
+- `docs/`: ghi chú assets, kết quả kiểm tra và ảnh QA.
+
+Luật game và world không phụ thuộc DOM/Canvas. `render` dùng trạng thái để vẽ; `ui` chuyển thao tác thành action. Các thư mục cho inventory/progression sẽ được thêm khi triển khai mốc 4.
 
 - Bản đồ có seed để tái hiện lỗi và thử cân bằng.
 - Tạo bảng định nghĩa sprite tập trung, không rải tọa độ cắt ảnh trong logic game.
@@ -243,13 +243,13 @@ Hoàn thành khi: chơi được trận ngắn; quái chỉ hành động theo l
 
 ### Mốc 3 — Một tầng chơi khoảng năm phút
 
-- [ ] Sinh phòng và hành lang bằng seed.
-- [ ] Áp dụng quy tắc ghép tile đã kiểm tra; chỉ ngẫu nhiên hóa các biến thể tương thích.
-- [ ] Kiểm tra nhiều seed với sương mù tắt để rà góc trong/ngoài, điểm nối và mép bản đồ; kiểm tra lại sau khi đặt trang trí.
-- [ ] Tầm nhìn và vùng đã khám phá.
-- [ ] Hai loại địch, một bẫy, một phần thưởng và lối ra.
-- [ ] Kiểm tra đường đi từ điểm xuất phát đến lối ra.
-- [ ] Chơi thử để điều chỉnh nhịp khám phá và chiến đấu.
+- [x] Sinh phòng và hành lang bằng seed.
+- [x] Áp dụng quy tắc ghép tile đã kiểm tra; chỉ ngẫu nhiên hóa các biến thể tương thích.
+- [x] Kiểm tra nhiều seed với sương mù tắt để rà góc trong/ngoài, điểm nối và mép bản đồ; kiểm tra lại sau khi đặt trang trí.
+- [x] Tầm nhìn và vùng đã khám phá.
+- [x] Hai loại địch, một bẫy, một phần thưởng và lối ra.
+- [x] Kiểm tra đường đi từ điểm xuất phát đến lối ra.
+- [x] Chơi thử để điều chỉnh nhịp khám phá và chiến đấu. Đã kiểm tra tuyến bàn phím hoàn thành tầng và mô phỏng 20 seed; thời lượng cho người chơi thực tế tiếp tục cần phản hồi.
 
 Hoàn thành khi: một tầng có mở đầu và kết thúc; không sinh thực thể trong tường, trùng ô hoặc ở vị trí không thể tiếp cận; người chơi hiểu nguy hiểm mà không cần giải thích trực tiếp. Các seed được kiểm tra không có tile sai vai trò, góc nối sai hoặc trang trí chặn đường bắt buộc.
 
@@ -297,10 +297,76 @@ Hoàn thành khi: người mới nhận biết được mục tiêu, cách chơi
 4. Hoàn thành vòng chơi ba tầng.
 5. Trau chuốt hình ảnh, âm thanh và mở rộng nội dung.
 
-Các số liệu về thời lượng, chỉ số và số lượng vật phẩm là mục tiêu ban đầu; chốt bằng kết quả chơi thử. Mốc 1 và 2 đã có bản triển khai; các mốc 3–5 chưa thực hiện.
+Các số liệu về thời lượng, chỉ số và số lượng vật phẩm là mục tiêu ban đầu; chốt bằng kết quả chơi thử. Mốc 1–3 đã hoàn thành về chức năng và QA; thời lượng/độ khó tiếp tục điều chỉnh theo phản hồi người chơi. Mốc 4–5 chưa thực hiện.
 
 ## 11. Trạng thái triển khai mốc 1–2
 
 Đã hoàn thành bản thử phòng chiến đấu, hai hành vi địch, camera/animation, HP, thắng/thua và chơi lại. Có thư viện 38 PNG cùng preview Boss bốn hướng; bốn map kiểm tra có lớp lưới, mã ghép và va chạm. Tường được ghép từ mặt và dải viền theo tám ô lân cận; cửa trong map mẫu là hình tạm Canvas. Đã xoá counter, logo, ảnh hero, icon và favicon mẫu Vite.
 
-Kiểm chứng: build production thành công, 14 bài test luật game/dữ liệu chạy đạt và QA giao diện Chrome headless chạy đạt. Chi tiết kích thước frame, vùng cắt, giới hạn tileset và ảnh kiểm chứng ở [docs/ASSETS.md](docs/ASSETS.md); hướng dẫn chạy ở [README.md](README.md). Dungeon ngẫu nhiên, nhặt đồ và boss chiến đấu thuộc các mốc sau.
+Kiểm chứng ở mốc 1–2: build production thành công, 14 bài test luật game/dữ liệu chạy đạt và QA giao diện Chrome headless chạy đạt. Chi tiết kích thước frame, vùng cắt, giới hạn tileset và ảnh kiểm chứng ở [docs/ASSETS.md](docs/ASSETS.md); hướng dẫn chạy ở mục 13 của tài liệu này. Dungeon ngẫu nhiên và phần thưởng được triển khai tiếp ở mốc 3; boss chiến đấu thuộc mốc 4.
+
+## 12. Trạng thái triển khai mốc 3
+
+- Đã có dungeon 45×35 ô, 9 phòng, hành lang kết nối và hai đường tắt. Seed tái hiện bố cục, hoa văn và vị trí vật thể.
+- Có 8 địch thuộc hai hành vi, 3 bẫy gai, một Tàn hỏa tăng sát thương, hai bình hồi máu, thùng cản đường và trang trí không cản đường.
+- Có FOV bán kính 7 ô, vùng đã khám phá, minimap và ẩn địch/vật phẩm ngoài tầm nhìn. Địch chỉ truy đuổi vị trí cuối đã thấy trong thời gian ngắn.
+- Đứng trên cầu thang rồi nhấn E/Enter để hoàn thành bản thử một tầng. Không yêu cầu hạ hết địch.
+- Đã cập nhật UI tạo/chơi lại seed và map inspector xem toàn tầng trước/sau trang trí hoặc có sương mù.
+- Build thành công; 26 bài test đạt, bao gồm 1.000 seed hợp lệ và các luật FOV, bẫy, phần thưởng, lối ra.
+- Mô phỏng 20 seed hoàn thành trong 57–143 lượt. Bot biết toàn map; đây chưa phải đo thời lượng chơi thực tế khoảng năm phút.
+- Đã chạy 47/47 mục QA trình duyệt, hoàn thành tầng bằng 67 hành động bàn phím và kiểm tra renderer/FOV. Đã xem ảnh bốn seed, đối chiếu trước/sau trang trí và khi bật sương mù.
+- Đã sửa icon bình hồi máu và phần sprite thùng có thể lộ từ ô chưa khám phá; kiểm tra lại đều đạt. Chi tiết và ảnh tại [docs/QA-MILESTONE-3.md](docs/QA-MILESTONE-3.md).
+
+## 13. Hướng dẫn phát triển và chơi thử
+
+### File kiểm thử cục bộ và Git
+
+Theo cấu hình `.gitignore`, thư mục `tests/`, script `tools/browser-qa.ps1`, `tools/playtest.mjs`, ảnh PNG trong `docs/` và các báo cáo sinh tự động (`browser-qa-result.html`, `playtest.json`) chỉ được giữ cục bộ, không đưa vào commit. Các file đã được bỏ theo dõi trong Git nhưng vẫn còn trên máy.
+
+Các lệnh test/playtest và QA bên dưới cần những file cục bộ này; một bản clone mới sẽ không có sẵn chúng. Các liên kết đến ảnh/báo cáo sinh tự động trong tài liệu cũng chỉ dùng được khi có kết quả QA trên máy. Tài liệu Markdown và script kiểm kê assets vẫn được quản lý trong Git.
+
+### Chạy dự án
+
+Khuyến nghị Node.js 22.15 trở lên. Cài dependency bằng `npm install` khi cần.
+
+```sh
+npm run dev
+npm run build
+npm test
+npm run playtest
+```
+
+Trong PowerShell, dùng `npm.cmd` nếu script `npm.ps1` của máy gặp lỗi quyền truy cập.
+
+### Chơi bản thử
+
+- Mặc định vào dungeon một tầng, 9 phòng. Chọn phòng luyện tập để chơi lại bản mốc 2.
+- WASD / mũi tên: đi bốn hướng; đi vào địch để đánh.
+- Space / dấu chấm: chờ một lượt; không tự hồi máu vô hạn.
+- E / Enter khi đứng trên cầu thang: hoàn thành tầng. Không cần hạ hết địch.
+- Esc: tạm dừng / tiếp tục; mất focus cũng tạm dừng.
+- R: chơi lại sau khi thắng/chết. Chơi lại giữ nguyên seed; nút seed mới tạo tầng khác.
+- Sinh vật áp sát; lính canh báo trước đòn quét bằng ô đỏ rồi có một lượt hồi sức.
+- Bẫy gai: vàng là báo trước, đỏ là nguy hiểm. Gây 5 sát thương lên cả người chơi lẫn địch.
+- Tàn hỏa đỏ: tăng 1 sát thương kiếm và hồi tối đa 8 HP, chỉ nhận một lần.
+- Bình máu: hồi tối đa 12 HP; khi đầy máu, bình vẫn nằm trên sàn. Có thể bước lên hoặc chờ trên bình khi thiếu máu để nhặt.
+- Sàn đã khám phá được ghi nhớ; vị trí địch và vật phẩm ngoài tầm nhìn không hiển thị. Minimap chỉ ghi phần địa hình đã khám phá.
+- Bản thử hiện chỉ có một tầng; chưa có hệ thống ba tầng, trang bị/túi đồ đầy đủ hay boss chiến đấu.
+
+### Công cụ kiểm tra
+
+- Tab **Kiểm tra map**: bốn fixture và lựa chọn **Dungeon theo seed** để xem toàn tầng đang chơi.
+- Bật lưới, mã ghép, va chạm, trang trí và sương mù để đối chiếu.
+- Tab **Assets**: xem 38 PNG, vùng cắt, animation và điểm đặt chân.
+- Ví dụ: `/?seed=bridge`, `/?view=lab&fixture=4&seed=bridge`, `/?scenario=arena`.
+- Sau khi thêm/đổi ảnh: `npm run assets:scan`, sau đó build và test.
+
+Xem [docs/ASSETS.md](docs/ASSETS.md) để biết tọa độ cắt và giới hạn tileset.
+
+### Kiểm chứng
+
+`npm test`: 26 bài kiểm tra luật game và dữ liệu, gồm 256 tổ hợp ô lân cận và kiểm tra kết nối/vị trí sinh trên 1.000 seed.
+
+`npm run playtest`: bot mô phỏng 20 seed bằng luật game thật, lưu `docs/playtest.json` và tuyến bàn phím dùng cho QA. Bot biết toàn bộ map nên kết quả này không xác nhận thời lượng chơi khoảng năm phút cho người mới.
+
+`tests/browser/index.html` là trang QA trên dev server; `render-checks.ts` kiểm tra canvas và sương mù bằng dữ liệu mẫu. `tools/browser-qa.ps1` chạy Chrome headless trên Windows để kiểm tra bàn phím, thắng/thua, seed và chụp map trước/sau trang trí. Cần dev server tại `127.0.0.1:5173` và Chrome ở đường dẫn trong script. QA mốc 3 đạt 47/47 mục; báo cáo và ảnh trong `docs/`. Thời lượng khoảng năm phút vẫn là mục tiêu cần đối chiếu bằng trải nghiệm người chơi thực tế.

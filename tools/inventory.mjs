@@ -14,5 +14,5 @@ async function scan(dir) {
   return result.sort((a, b) => a.path.localeCompare(b.path))
 }
 const entries = await scan(root)
-await writeFile('src/asset-manifest.json', JSON.stringify(entries, null, 2) + '\n')
-console.log(`Đã kiểm kê ${entries.length} PNG → src/asset-manifest.json`)
+await writeFile('src/data/asset-manifest.json', JSON.stringify(entries, null, 2) + '\n')
+console.log(`Đã kiểm kê ${entries.length} PNG → src/data/asset-manifest.json`)

@@ -23,3 +23,13 @@ dist-ssr
 *.sln
 *.sw?
 /.browser-qa/
+
+# Local development tests and QA tools
+/tests/
+/tools/browser-qa.ps1
+/tools/playtest.mjs
+
+# Generated QA screenshots and reports
+/docs/*.png
+/docs/browser-qa-result.html
+/docs/playtest.json

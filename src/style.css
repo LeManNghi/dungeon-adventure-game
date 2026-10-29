@@ -94,3 +94,4 @@ nav button{flex:1;padding:10px 5px}
 h1{font-size:34px}
 }
 
+.seed-row{display:flex;gap:6px}.seed-row input{width:100%;min-width:0;background:#121619;border:1px solid #47483e;border-radius:3px;padding:8px;color:#d6cfbc;font:11px Consolas,monospace}.seed-row .secondary{padding:7px 12px}.objective{border-left:2px solid #b58a4f;margin-top:18px;padding:0 0 0 12px}.objective strong{font-size:11px;color:#d2bd93;font-weight:500}.objective p{font-size:11px;color:#8b9690;line-height:1.7;margin:7px 0}.objective>span{font-size:10px;color:#c49d67}.stage-heading{flex-wrap:wrap}#scene-state{overflow-wrap:anywhere;max-width:65%}
