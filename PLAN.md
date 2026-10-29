@@ -181,9 +181,18 @@ src/
   data/
     sprites.ts            # Frame, vùng cắt và điểm đặt chân
     asset-manifest.json   # Kích thước PNG thực tế
+    items.ts              # Vũ khí, giáp, thuốc và hàng tiếp tế
+    enemies.ts            # Tên, chỉ số và khởi tạo địch
+    upgrades.ts           # Nâng cấp giữa tầng
+  systems/
+    combat.ts             # Phạm vi vũ khí và kiểm tra ô né
+    inventory.ts          # Giới hạn túi, gộp bình máu
+    enemies.ts            # AI, đòn báo trước và giải quyết đòn đánh
+    boss.ts               # Chọn đòn boss có đường né hợp lệ
   ui/
     app.ts                # Điều phối UI, bàn phím, seed và các tab
     layout.ts             # Khung HTML
+    gamePanels.ts         # HUD, túi đồ, tiếp tế và kết thúc
 public/assets/            # Ảnh gốc
 tests/                    # Xem các thư mục con bên dưới
 ```
@@ -194,7 +203,7 @@ tests/                    # Xem các thư mục con bên dưới
 - `tools/`: script kiểm kê assets, mô phỏng chơi và chạy Chrome QA.
 - `docs/`: ghi chú assets, kết quả kiểm tra và ảnh QA.
 
-Luật game và world không phụ thuộc DOM/Canvas. `render` dùng trạng thái để vẽ; `ui` chuyển thao tác thành action. Các thư mục cho inventory/progression sẽ được thêm khi triển khai mốc 4.
+Luật game, world và systems không phụ thuộc DOM/Canvas. `render` dùng trạng thái để vẽ; `ui` chuyển thao tác thành action. `Game` quản lý tiến trình lượt chơi và gọi các hệ thống; dữ liệu trang bị, địch và nâng cấp nằm trong `data`.
 
 - Bản đồ có seed để tái hiện lỗi và thử cân bằng.
 - Tạo bảng định nghĩa sprite tập trung, không rải tọa độ cắt ảnh trong logic game.
@@ -257,14 +266,14 @@ Hoàn thành khi: một tầng có mở đầu và kết thúc; không sinh th�
 
 ### Mốc 4 — Một lượt chơi hoàn chỉnh
 
-- [ ] Ba tầng với độ khó tăng dần.
-- [ ] Ba kiểu vũ khí, thuốc, túi đồ và điểm tiếp tế.
-- [ ] XP, cấp độ và lựa chọn nâng cấp giữa tầng.
-- [ ] Hành vi địch thứ ba.
-- [ ] Tích hợp bốn hướng Boss Monster và đấu trường cuối tầng 3.
-- [ ] Boss có trạng thái chuẩn bị, húc, đập đất, hồi sức và chuyển giai đoạn.
-- [ ] Thanh máu boss, vùng báo đòn, khóa/mở lối ra và điều kiện chiến thắng.
-- [ ] Màn hình thắng/thua, thống kê và bắt đầu lại.
+- [x] Ba tầng với độ khó tăng dần.
+- [x] Ba kiểu vũ khí, thuốc, túi đồ và điểm tiếp tế.
+- [x] XP, cấp độ và lựa chọn nâng cấp giữa tầng.
+- [x] Hành vi địch thứ ba.
+- [x] Tích hợp bốn hướng Boss Monster và đấu trường cuối tầng 3.
+- [x] Boss có trạng thái chuẩn bị, húc, đập đất, hồi sức và chuyển giai đoạn.
+- [x] Thanh máu boss, vùng báo đòn, khóa/mở lối ra và điều kiện chiến thắng.
+- [x] Màn hình thắng/thua, thống kê và bắt đầu lại.
 
 Hoàn thành khi: có thể chơi liên tục từ đầu tới thắng hoặc thua; chuyển tầng giữ đúng nhân vật/trang bị và không mang trạng thái địch cũ sang tầng mới. Mọi đòn đặc biệt của boss có thể né bằng hành động hợp lệ; không có sát thương bất ngờ lúc chuyển giai đoạn hoặc đòn vẫn tiếp tục sau khi boss chết.
 
@@ -297,7 +306,7 @@ Hoàn thành khi: người mới nhận biết được mục tiêu, cách chơi
 4. Hoàn thành vòng chơi ba tầng.
 5. Trau chuốt hình ảnh, âm thanh và mở rộng nội dung.
 
-Các số liệu về thời lượng, chỉ số và số lượng vật phẩm là mục tiêu ban đầu; chốt bằng kết quả chơi thử. Mốc 1–3 đã hoàn thành về chức năng và QA; thời lượng/độ khó tiếp tục điều chỉnh theo phản hồi người chơi. Mốc 4–5 chưa thực hiện.
+Các số liệu về thời lượng, chỉ số và số lượng vật phẩm là mục tiêu ban đầu; chốt bằng kết quả chơi thử. Mốc 1–4 đã hoàn thành về chức năng và QA; thời lượng/độ khó tiếp tục điều chỉnh theo phản hồi người chơi. Mốc 5 chưa thực hiện.
 
 ## 11. Trạng thái triển khai mốc 1–2
 
@@ -340,18 +349,21 @@ Trong PowerShell, dùng `npm.cmd` nếu script `npm.ps1` của máy gặp lỗi 
 
 ### Chơi bản thử
 
-- Mặc định vào dungeon một tầng, 9 phòng. Chọn phòng luyện tập để chơi lại bản mốc 2.
+- Mặc định bắt đầu hành trình ba tầng, mỗi tầng 9 phòng. Chọn phòng luyện tập trong phần Bản đồ và seed để chơi lại phòng cố định.
 - WASD / mũi tên: đi bốn hướng; đi vào địch để đánh.
+- Shift + WASD / mũi tên: đánh theo hướng mà không di chuyển, sử dụng đúng phạm vi vũ khí. Giáo đâm xa tối đa hai ô; rìu quét ba ô phía trước và buộc chờ một lượt hồi sức.
+- I: mở/đóng túi đồ. Mở túi không tốn lượt; trang bị, bỏ đồ hoặc uống thuốc tốn một lượt. Đóng túi trước khi tiếp tục di chuyển.
 - Space / dấu chấm: chờ một lượt; không tự hồi máu vô hạn.
-- E / Enter khi đứng trên cầu thang: hoàn thành tầng. Không cần hạ hết địch.
+- E / Enter khi đứng trên cầu thang ở tầng 1–2: tới điểm tiếp tế. Chọn một nâng cấp, mua/bán đồ nếu cần rồi xuống tầng. Không cần hạ hết địch để rời tầng 1–2.
+- Phím 1–3: dùng một trong ba chồng bình máu đầu tiên trong túi. Khi đầy HP, thao tác không tốn lượt và không mất bình.
 - Esc: tạm dừng / tiếp tục; mất focus cũng tạm dừng.
 - R: chơi lại sau khi thắng/chết. Chơi lại giữ nguyên seed; nút seed mới tạo tầng khác.
 - Sinh vật áp sát; lính canh báo trước đòn quét bằng ô đỏ rồi có một lượt hồi sức.
 - Bẫy gai: vàng là báo trước, đỏ là nguy hiểm. Gây 5 sát thương lên cả người chơi lẫn địch.
 - Tàn hỏa đỏ: tăng 1 sát thương kiếm và hồi tối đa 8 HP, chỉ nhận một lần.
-- Bình máu: hồi tối đa 12 HP; khi đầy máu, bình vẫn nằm trên sàn. Có thể bước lên hoặc chờ trên bình khi thiếu máu để nhặt.
+- Bình máu: nhặt vào túi, tối đa ba bình trong mỗi chồng. Hồi tối đa 12 HP khi sử dụng; không tự uống khi nhặt.
 - Sàn đã khám phá được ghi nhớ; vị trí địch và vật phẩm ngoài tầm nhìn không hiển thị. Minimap chỉ ghi phần địa hình đã khám phá.
-- Bản thử hiện chỉ có một tầng; chưa có hệ thống ba tầng, trang bị/túi đồ đầy đủ hay boss chiến đấu.
+- Tầng 3 kết thúc bằng boss. Cổng đóng khi vào đấu trường; hạ boss sẽ mở cổng và hiện màn thắng sau hiệu ứng chết. Thống kê gồm tầng, lượt, địch đã hạ, cấp và vàng.
 
 ### Công cụ kiểm tra
 
@@ -365,8 +377,37 @@ Xem [docs/ASSETS.md](docs/ASSETS.md) để biết tọa độ cắt và giới h
 
 ### Kiểm chứng
 
-`npm test`: 26 bài kiểm tra luật game và dữ liệu, gồm 256 tổ hợp ô lân cận và kiểm tra kết nối/vị trí sinh trên 1.000 seed.
+`npm test`: 42 bài kiểm tra luật game và dữ liệu, gồm 256 tổ hợp ô lân cận, 1.000 seed tầng 1 và 200 seed trên cả ba tầng. Có kiểm tra trang bị, giới hạn túi, shop, chuyển tầng, địch bắn xa và các trạng thái boss.
 
-`npm run playtest`: bot mô phỏng 20 seed bằng luật game thật, lưu `docs/playtest.json` và tuyến bàn phím dùng cho QA. Bot biết toàn bộ map nên kết quả này không xác nhận thời lượng chơi khoảng năm phút cho người mới.
+`npm run playtest`: bot mô phỏng trọn hành trình trên 12 seed bằng luật game thật, lưu `docs/playtest.json` và tuyến giao diện trong `tests/browser/run-route.json`. Bot biết toàn bộ map nên kết quả này không xác nhận thời lượng hoặc độ khó đối với người chơi mới.
 
-`tests/browser/index.html` là trang QA trên dev server; `render-checks.ts` kiểm tra canvas và sương mù bằng dữ liệu mẫu. `tools/browser-qa.ps1` chạy Chrome headless trên Windows để kiểm tra bàn phím, thắng/thua, seed và chụp map trước/sau trang trí. Cần dev server tại `127.0.0.1:5173` và Chrome ở đường dẫn trong script. QA mốc 3 đạt 47/47 mục; báo cáo và ảnh trong `docs/`. Thời lượng khoảng năm phút vẫn là mục tiêu cần đối chiếu bằng trải nghiệm người chơi thực tế.
+`tests/browser/index.html` là trang QA trên dev server; `render-checks.ts` kiểm tra canvas và sương mù bằng dữ liệu mẫu. `tools/browser-qa.ps1` chạy Chrome headless trên Windows để kiểm tra bàn phím, túi đồ, tiếp tế, chuyển tầng, thắng/thua và chụp các trạng thái boss. Thêm `-SkipScreenshots` để chỉ chạy lượt QA tương tác. Cần dev server tại `127.0.0.1:5173` và Chrome ở đường dẫn trong script. Báo cáo và ảnh được sinh cục bộ trong `docs/`, đã có quy tắc ignore.
+
+## 14. Trạng thái triển khai mốc 4
+
+### Vòng chơi và tiến trình
+
+- Ba tầng: Khu canh gác → Kho ngầm bỏ hoang → Điện nghi lễ. Tầng sau dùng seed dẫn xuất từ seed gốc, tăng HP và sát thương địch.
+- Giữ HP, vàng, cấp, XP, trang bị và nâng cấp khi chuyển tầng; xóa địch/ý định tấn công, trạng thái bẫy, vùng khám phá và hiệu ứng của tầng cũ. Bắt đầu tầng mới ở trạng thái chờ hành động.
+- Hạ địch cho XP và vàng đúng một lần. Lên cấp tăng một sát thương và bốn HP tối đa, hồi tối đa bốn HP; không có hồi sinh sau khi HP đã về 0.
+- Túi 8 ô, một vũ khí và một giáp đang trang bị. Có kiếm/giáo/rìu, giáp và bình máu; trang bị có ba cấp thường, hoàng kim, hư không. Đồ không nhặt được do túi đầy vẫn nằm trên sàn.
+- Điểm tiếp tế giữa tầng bán bình máu, giáo, rìu và giáp. Mỗi món mua một lần mỗi điểm; có thể bán đồ chưa trang bị. Giao dịch thất bại không mất vàng.
+- Mỗi điểm tiếp tế chọn một trong ba nâng cấp: Nhẫn nại (+3 sát thương đòn sau khi chờ), Tàn hỏa hồi sinh (+3 HP khi hạ địch), Hộ thân (4 chắn khi lần đầu vào phòng). Chọn lại tăng hiệu lực; không được chọn nhiều nâng cấp trong cùng một điểm.
+- Lính nỏ từ tầng 2 dùng sprite Warrior với ký hiệu N, giữ khoảng cách, báo đường bắn trước một lượt. Tường/cổng và mục tiêu đầu tiên chặn đạn.
+
+### Boss và kết thúc
+
+- Boss có bộ sprite bốn hướng riêng trong phòng lớn cuối tầng 3; không sinh quái thường hoặc bẫy trong đấu trường. Kích hoạt khi bước vào phòng, khóa các cổng và chiếu sáng đấu trường để đọc tín hiệu.
+- Húc thẳng tối đa bốn ô hoặc đập đất bốn ô kề, khóa vùng đánh trước khi người chơi phản ứng. Chỉ chọn đòn khi có ô né hợp lệ; không bắt đầu báo đòn mới trong lúc người chơi đang buộc hồi sức vì dùng rìu. Giữ một lượt hồi sức sau đòn đặc biệt. Húc dừng trước tường/vật cản, không chồng ô với người chơi và không gây sát thương lặp trong cùng đòn.
+- Khi HP còn 50% hoặc thấp hơn, chuyển cuồng nộ một lần: hủy đòn đang chuẩn bị, báo hiệu và không đánh ngay trong lượt chuyển. Sau đó tăng tần suất đòn đặc biệt, vẫn giữ báo trước/hồi sức.
+- Boss chết sẽ hủy ý định tấn công, mở cổng, khóa input và phát hiệu ứng chết. UI chờ 650 ms bằng bộ hẹn giờ riêng rồi hiện màn thắng, tránh phụ thuộc vào tiến độ vòng vẽ.
+- Thua hoặc thắng có thống kê hành trình; chơi lại đặt lại toàn bộ tiến trình và bắt đầu tầng 1 với cùng seed. Có thể tạo seed mới qua mục Bản đồ và seed.
+
+### Kiểm chứng
+
+- Build production thành công, 42/42 bài test đạt; QA trình duyệt đạt 515 mục kiểm tra, bao gồm xác nhận một lượt cho từng hành động trong tuyến chơi lại.
+- Bot hoàn thành trọn ba tầng và hạ boss trên 12/12 seed, trong 357–581 lượt. Có kiểm tra nhân vật không chồng ô/đứng trong tường sau từng hành động.
+- QA trình duyệt chơi lại hành trình `tan-hoa-01` bằng 445 hành động hợp lệ, qua hai điểm tiếp tế, giao dịch và nâng cấp, hạ boss, hiện màn thắng rồi chơi lại; đồng thời kiểm tra màn thua và phím R.
+- Đã xem ảnh hai điểm tiếp tế, toàn map đấu trường, đòn húc, đập đất, cuồng nộ và màn thắng. Ảnh cục bộ `docs/m4-*.png`; báo cáo tương tác `docs/browser-qa-result.html`.
+- QA đã phát hiện và sửa việc màn thắng phụ thuộc vòng vẽ, cùng các nút dùng đồ còn bật ở điểm tiếp tế/khi đã kết thúc. Lượt QA cuối không ghi nhận lỗi JavaScript runtime.
+- Mốc 5 tiếp tục cân bằng độ khó/thời lượng, âm thanh, hướng dẫn và kiểm tra kích thước màn hình. Kết quả bot không thay thế phản hồi người chơi thực tế.

@@ -2,24 +2,31 @@ import { distance, key, setTile, tile, walkable } from './tiles'
 import { reachable } from './pathfinding'
 import { normalizeSeed, hashSeed, seededRandom } from './random'
 import type { Board, Point } from './tiles'
+import type { ItemId } from '../data/items'
 
 export type Room = { x: number; y: number; w: number; h: number; center: Point }
 export type Trap = Point & { phase: number }
-export type Loot = Point & { kind: 'ember' | 'heal' }
+export type Loot = Point & { kind: 'ember' | 'heal' | 'gold' | 'gear'; itemId?:ItemId; tier?:number }
 export type Decoration = Point & { kind: 'skull' | 'barrel' | 'torch' }
 export type Dungeon = {
   seed: string; board: Board; rooms: Room[]; start: Point; exit: Point
-  enemies: (Point & { kind: 'monster' | 'warrior' })[]
+  enemies: (Point & { kind: 'monster' | 'warrior' | 'ranger' | 'boss' })[]
   traps: Trap[]; loot: Loot[]; decorations: Decoration[]
+  bossArena?: BossArena
 }
-export function generateDungeon(input: string): Dungeon {
-  const seed = normalizeSeed(input), random = seededRandom(seed)
+export type BossArena = { x:number; y:number; w:number; h:number; gates:Point[] }
+export const floorNames = ['Khu canh gác','Kho ngầm bỏ hoang','Điện nghi lễ']
+export function inRoom(p:Point,r:{x:number;y:number;w:number;h:number}) {return p.x>=r.x&&p.y>=r.y&&p.x<r.x+r.w&&p.y<r.y+r.h}
+export function generateDungeon(input: string, floorNumber = 1): Dungeon {
+  if(!Number.isInteger(floorNumber)||floorNumber<1||floorNumber>3)throw new Error('Tầng phải nằm trong khoảng 1–3')
+  const seed = normalizeSeed(input), derived=floorNumber===1?seed:`${seed}:floor:${floorNumber}`, random = seededRandom(derived)
   const int = (min: number, max: number) => min + Math.floor(random() * (max - min + 1))
-  const board: Board = { width: 45, height: 35, cells: Array.from({ length: 35 }, () => '#'.repeat(45)), name: 'Khu canh gác', variantSeed: hashSeed(seed) }
+  const board: Board = { width: 45, height: 35, cells: Array.from({ length: 35 }, () => '#'.repeat(45)), name: floorNames[floorNumber-1]!, variantSeed: hashSeed(derived) }
   const rooms: Room[] = []
   const dig = (x: number, y: number) => setTile(board, x, y, '.')
   for (let row = 0; row < 3; row++) for (let col = 0; col < 3; col++) {
-    const x = 2 + col * 14 + int(0, 2), y = 2 + row * 10 + int(0, 1), w = int(7, 10), h = int(6, 8)
+    let x = 2 + col * 14 + int(0, 2), y = 2 + row * 10 + int(0, 1), w = int(7, 10), h = int(6, 8)
+    if(floorNumber===3 && col===2 && row===2) {x=30;y=22;w=12;h=10}
     const room = { x, y, w, h, center: { x: x + Math.floor(w / 2), y: y + Math.floor(h / 2) } }
     rooms.push(room)
     for (let yy = y; yy < y + h; yy++) for (let xx = x; xx < x + w; xx++) dig(xx, yy)
@@ -56,7 +63,7 @@ export function generateDungeon(input: string): Dungeon {
   for (let i = 0; i < 9; i++) for (const j of adjacent(i)) if (i < j && !connected.has(`${i}-${j}`)) extras.push([i,j])
   for (let i = 0; i < 2 && extras.length; i++) { const [a,b] = extras.splice(int(0,extras.length-1),1)[0]!; connect(a,b) }
   const start = { ...rooms[0]!.center }, steps = reachable(board, start)
-  const exitRoom = rooms.reduce((a,b) => steps.get(key(a.center))! > steps.get(key(b.center))! ? a : b)
+  const exitRoom = floorNumber===3 ? rooms[8]! : rooms.reduce((a,b) => steps.get(key(a.center))! > steps.get(key(b.center))! ? a : b)
   const exit = { ...exitRoom.center }; setTile(board, exit.x, exit.y, '>')
   const occupied = new Set([key(start), key(exit)])
   const decorations: Decoration[] = []
@@ -75,7 +82,15 @@ export function generateDungeon(input: string): Dungeon {
     if (!candidates.length) throw new Error(`Không có vị trí sinh hợp lệ: ${seed}`)
     const p = candidates[int(0,candidates.length-1)]!; occupied.add(key(p)); return p
   }
-  const enemies = rooms.slice(1).map((r,i) => ({ ...place(r,8), kind: (i % 3 === 2 ? 'warrior' : 'monster') as 'warrior' | 'monster' }))
+  const enemies: Dungeon['enemies'] = rooms.slice(1,floorNumber===3?8:9).map((r,i) => ({ ...place(r,8), kind: floorNumber>1 && i%3===1?'ranger':i%3===2?'warrior':'monster' }))
+  let bossArena:BossArena|undefined
+  if(floorNumber===3) {
+    const r=rooms[8]!,gates:Point[]=[]
+    for(let y=r.y;y<r.y+r.h;y++)for(const x of [r.x-1,r.x+r.w])if(walkable(board,x,y))gates.push({x,y})
+    for(let x=r.x;x<r.x+r.w;x++)for(const y of [r.y-1,r.y+r.h])if(walkable(board,x,y))gates.push({x,y})
+    bossArena={x:r.x,y:r.y,w:r.w,h:r.h,gates}
+    const boss={x:r.center.x,y:r.center.y-2,kind:'boss' as const};occupied.add(key(boss));enemies.push(boss)
+  }
   const loot: Loot[] = [
     { ...place(rooms[4]!), kind: 'ember' },
     { ...place(rooms[2]!), kind: 'heal' },
@@ -83,7 +98,9 @@ export function generateDungeon(input: string): Dungeon {
   ]
   const traps: Trap[] = [1,5,7].map(i => ({ ...place(rooms[i]!), phase: 0 }))
   rooms.forEach((r,i) => { if (i % 2) decorations.push({ ...place(r), kind: 'skull' }) })
-  const dungeon = { seed, board, rooms, start, exit, enemies, traps, loot, decorations }
+  for(const i of [1,3,5])loot.push({...place(rooms[i]!),kind:'gear',itemId:i===1?'spear':i===3?'axe':'armor',tier:floorNumber-1})
+  for(const i of [2,4,6])loot.push({...place(rooms[i]!),kind:'gold'})
+  const dungeon = { seed, board, rooms, start, exit, enemies, traps, loot, decorations, bossArena }
   const errors = validateDungeon(dungeon)
   if (errors.length) throw new Error(`Dungeon không hợp lệ (${seed}): ${errors.join('; ')}`)
   return dungeon

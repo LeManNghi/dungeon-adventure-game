@@ -5,9 +5,9 @@ export const key = (p: Point) => `${p.x},${p.y}`
 export const same = (a: Point, b: Point) => a.x === b.x && a.y === b.y
 export const distance = (a: Point, b: Point) => Math.abs(a.x - b.x) + Math.abs(a.y - b.y)
 export function tile(board: Board, x: number, y: number) { return board.cells[y]?.[x] ?? '#' }
-export function floor(board: Board, x: number, y: number) { return ['.', '>', 'B'].includes(tile(board, x, y)) }
-export function walkable(board: Board, x: number, y: number) { return floor(board, x, y) && tile(board, x, y) !== 'B' }
-export function opaque(board: Board, x: number, y: number) { return ['#', '+'].includes(tile(board, x, y)) }
+export function floor(board: Board, x: number, y: number) { return ['.', '>', 'B', 'G'].includes(tile(board, x, y)) }
+export function walkable(board: Board, x: number, y: number) { return floor(board, x, y) && !['B','G'].includes(tile(board, x, y)) }
+export function opaque(board: Board, x: number, y: number) { return ['#', '+','G'].includes(tile(board, x, y)) }
 export function floorVariant(board: Board, x: number, y: number) { return (((x * 31 + y * 17) ^ (board.variantSeed ?? 0)) >>> 0) % 13 }
 export function setTile(board: Board, x: number, y: number, value: string) {
   const row = board.cells[y]!

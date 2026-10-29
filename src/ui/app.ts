@@ -8,6 +8,8 @@ import { fixture, fixtureNames } from '../world/fixtures'
 import { normalizeSeed } from '../world/random'
 
 import { mountLayout } from './layout'
+import { playerPanel, inventoryPanel, campPanel, endingPanel } from './gamePanels'
+import type { UpgradeId } from '../data/upgrades'
 
 export function startApp() {
   mountLayout()
@@ -18,6 +20,8 @@ export function startApp() {
   let currentScenario: 'arena' | 'dungeon' = params.get('scenario') === 'arena' ? 'arena' : 'dungeon'
   let game = new Game({ scenario: currentScenario, seed: currentSeed }), mode = 'combat', paused = false, ready = false, lockedUntil = 0
   let labGame = game.scenario === 'dungeon' ? game : new Game({ scenario:'dungeon',seed:currentSeed })
+  let inventoryOpen = false
+  let victoryTimer: number | undefined
   let fixtureIndex = 0, assetPath = 'Map/Map_tileset.png', cropName = ''
   const labNames = [...fixtureNames, 'Dungeon theo seed']
   if (['combat', 'lab', 'assets'].includes(params.get('view') ?? '')) mode = params.get('view')!
@@ -47,18 +51,20 @@ export function startApp() {
   function refresh() {
     const p = game.player
     const dungeon = game.scenario === 'dungeon'
-    $('#scene-name').textContent = mode === 'combat' ? dungeon ? '01 / TẦNG 1 · KHU CANH GÁC' : '01 / PHÒNG LUYỆN TẬP' : mode === 'lab' ? `02 / ${labNames[fixtureIndex]}` : '03 / THƯ VIỆN ASSETS'
-    $('#scene-state').textContent = !ready ? 'ĐANG TẢI ASSETS…' : mode === 'combat' ? `LƯỢT ${String(game.turn).padStart(3,'0')} · ${paused ? 'TẠM DỪNG' : game.status === 'playing' ? 'CHỜ BẠN HÀNH ĐỘNG' : 'KẾT THÚC'}` : mode === 'lab' ? fixtureIndex === 4 ? `SEED: ${currentSeed}` : 'MAP CỐ ĐỊNH · KHÔNG SƯƠNG MÙ' : `${files.length} PNG · PIXEL GỐC`
+    $('#scene-name').textContent = mode === 'combat' ? dungeon ? `01 / TẦNG ${game.floor} · ${game.board.name.toUpperCase()}` : '01 / PHÒNG LUYỆN TẬP' : mode === 'lab' ? `02 / ${labNames[fixtureIndex]}` : '03 / THƯ VIỆN ASSETS'
+    $('#scene-state').textContent = !ready ? 'ĐANG TẢI ASSETS…' : mode === 'combat' ? `LƯỢT ${String(game.turn).padStart(3,'0')} · ${paused ? 'TẠM DỪNG' : game.status === 'playing' ? 'CHỜ BẠN HÀNH ĐỘNG' : game.status==='camp'?'ĐIỂM TIẾP TẾ':game.status==='victory'?'THÚ VƯƠNG ĐÃ GỤC':'KẾT THÚC'}` : mode === 'lab' ? fixtureIndex === 4 ? `SEED: ${currentSeed}` : 'MAP CỐ ĐỊNH · KHÔNG SƯƠNG MÙ' : `${files.length} PNG · PIXEL GỐC`
     $('#coords').textContent = mode === 'combat' ? `${p.x}, ${p.y}` : ''
-    $('#stage-hint').textContent = mode === 'combat' ? dungeon ? (game.exit && p.x === game.exit.x && p.y === game.exit.y ? 'Đã tới cầu thang. Nhấn E / Enter để hoàn thành tầng.' : 'Tìm cầu thang. Ô vàng báo bẫy; ô đỏ gây sát thương. Bình máu nhặt khi thiếu HP.') : 'Mỗi hành động là một lượt. Không có áp lực thời gian.' : mode === 'lab' ? 'Viền nằm trong ô tường. Cửa đóng và thùng chặn đường; cầu thang đi được.' : 'Khung nguồn và animation dùng đúng kích thước riêng của từng nhân vật.'
-    const overlay = $('#overlay')
-    overlay.hidden = !((game.status !== 'playing' || paused) && mode === 'combat')
+    $('#stage-hint').textContent = mode === 'combat' ? dungeon ? game.floor===3 ? 'Tìm điện nghi lễ và hạ Thú Vương. I mở túi; Shift + hướng để dùng tầm vũ khí.' : (game.exit && p.x === game.exit.x && p.y === game.exit.y ? 'Đã tới cầu thang. Nhấn E / Enter để tới điểm tiếp tế.' : 'Tìm cầu thang. Ô vàng báo bẫy; ô đỏ gây sát thương. Bình máu nhặt khi thiếu HP.') : 'Mỗi hành động là một lượt. Không có áp lực thời gian.' : mode === 'lab' ? 'Viền nằm trong ô tường. Cửa đóng và thùng chặn đường; cầu thang đi được.' : 'Khung nguồn và animation dùng đúng kích thước riêng của từng nhân vật.'
+﻿    const overlay = $('#overlay')
+    overlay.hidden = mode !== 'combat' || (!paused && !inventoryOpen && !['camp','dead','won'].includes(game.status))
     if (!overlay.hidden) {
-      overlay.innerHTML = `<p class="eyebrow">${paused && game.status === 'playing' ? 'NGHỈ MỘT CHÚT' : game.status === 'dead' ? 'NGỌN LỬA ĐÃ TẮT' : dungeon ? 'ĐÃ TÌM THẤY ĐƯỜNG XUỐNG' : 'CĂN PHÒNG ĐÃ AN TOÀN'}</p><h2>${paused && game.status === 'playing' ? 'Đợi bước tiếp theo.' : game.status === 'dead' ? 'Bóng tối thắng lần này.' : 'Bạn vẫn còn ánh lửa.'}</h2><p>${paused && game.status === 'playing' ? 'Trò chơi đã dừng. Tiếp tục khi bạn sẵn sàng.' : `Kết thúc sau ${game.turn} lượt.${dungeon ? ` Tàn hỏa: ${game.emberFound?'đã tìm thấy':'chưa thu thập'}. Bản thử hiện có một tầng.` : ''}`}</p><button id="continue">${paused && game.status === 'playing' ? 'Tiếp tục' : dungeon ? 'Chơi lại seed này' : 'Thử lại'} <span>→</span></button>`
-      $('#continue').onclick = () => { if (paused && game.status === 'playing') paused = false; else restart(); refresh(); canvas.focus() }
+      if(game.status==='camp')overlay.innerHTML=campPanel(game)
+      else if(inventoryOpen&&!paused)overlay.innerHTML=inventoryPanel(game)
+      else if(paused&&game.status==='playing')overlay.innerHTML='<div class="modal-content"><p class="eyebrow">NGHỈ MỘT CHÚT</p><h2>Đợi bước tiếp theo.</h2><p>Thế giới đang chờ bạn.</p><button id="continue">Tiếp tục →</button></div>'
+      else overlay.innerHTML=endingPanel(game)
     }
     if (mode === 'combat') {
-      $('#context').innerHTML = `<p class="eyebrow">NGƯỜI GIỮ LỬA</p><div class="stat-title"><h2>Kẻ thám hiểm</h2><span>TẦNG 01</span></div><div class="health-label"><span>Sinh lực</span><strong>${p.hp} <small>/ ${p.maxHp}</small></strong></div><div class="health-track"><i style="width:${p.hp/p.maxHp*100}%"></i></div><div class="stat-row"><span>${game.emberFound?'Kiếm tàn hỏa':'Kiếm cũ'}</span><strong>${game.attack} sát thương</strong></div><div class="stat-row"><span>Địch còn lại</span><strong>${game.enemies.filter(e=>e.hp>0).length} / ${game.enemies.length}</strong></div>${dungeon?`<div class="objective"><strong>Mục tiêu: tìm đường xuống</strong><p>Đi lên cầu thang rồi nhấn E / Enter. Tàn hỏa đỏ tăng sức mạnh; không cần hạ hết địch.</p><span>${game.emberFound?'✦ Đã nhận Tàn hỏa':'◇ Tàn hỏa chưa tìm thấy'}</span></div>`:''}<label class="select-label" for="scenario">Chế độ chơi</label><select id="scenario"><option value="dungeon" ${dungeon?'selected':''}>Khám phá dungeon</option><option value="arena" ${!dungeon?'selected':''}>Phòng luyện tập</option></select>${seedControls()}<button class="secondary full" id="restart">${dungeon?'Chơi lại seed này':'Bắt đầu lại'}</button>`
+      $('#context').innerHTML = playerPanel(game) + `<details class="run-settings"><summary>Bản đồ và seed</summary><label class="select-label" for="scenario">Chế độ chơi</label><select id="scenario"><option value="dungeon" ${dungeon?'selected':''}>Khám phá dungeon</option><option value="arena" ${!dungeon?'selected':''}>Phòng luyện tập</option></select>${seedControls()}<button class="secondary full" id="restart">Bắt đầu lại</button></details>`
       $('#restart').onclick = restart
       $<HTMLSelectElement>('#scenario').onchange = e => { currentScenario=(e.target as HTMLSelectElement).value as 'arena'|'dungeon';restart();syncUrl() }
       $('#journal').innerHTML = `<p class="eyebrow">NHẬT KÝ HÀNH TRÌNH</p><ol class="log">${game.log.slice(0,5).map(l=>`<li>${escape(l)}</li>`).join('')}</ol><div class="tip"><strong>Đọc ý định của địch</strong><p>Ô đỏ là vùng sắp bị đánh. Bước ra ngoài trước lượt tiếp theo; tận dụng lúc lính canh hồi sức.</p></div>`
@@ -73,19 +79,43 @@ export function startApp() {
       $<HTMLSelectElement>('#asset').onchange = e => { assetPath=(e.target as HTMLSelectElement).value; cropName=''; refresh() }
       const cropSelect = $<HTMLSelectElement>('#crop')
       if (cropSelect) cropSelect.onchange = e => { cropName=(e.target as HTMLSelectElement).value; refresh() }
-      $('#journal').innerHTML = `<p class="eyebrow">GHI CHÚ KIỂM KÊ</p><p class="muted">Player: 7 frame đi trước, 8 frame các hướng còn lại. Warrior: 12 frame trước/sau, 8 frame trái/phải. Monster và Boss: 4 frame mỗi hướng.</p><div class="tip"><strong>Boss có bộ hình riêng</strong><p>Chọn BossMonster và từng hướng để xem animation cùng điểm đặt chân. Boss chưa tham gia phòng chiến đấu ở mốc 2.</p></div>${cropName ? `<p class="muted">${cropLabels[cropName]}: [x, y, w, h] = ${(crops[cropName as keyof typeof crops]).join(', ')}</p>` : ''}`
+      $('#journal').innerHTML = `<p class="eyebrow">GHI CHÚ KIỂM KÊ</p><p class="muted">Player: 7 frame đi trước, 8 frame các hướng còn lại. Warrior: 12 frame trước/sau, 8 frame trái/phải. Monster và Boss: 4 frame mỗi hướng.</p><div class="tip"><strong>Boss có bộ hình riêng</strong><p>Chọn BossMonster và từng hướng để xem animation cùng điểm đặt chân. Boss xuất hiện ở đấu trường cuối tầng 3.</p></div>${cropName ? `<p class="muted">${cropLabels[cropName]}: [x, y, w, h] = ${(crops[cropName as keyof typeof crops]).join(', ')}</p>` : ''}`
     }
-    bindSeedControls()
+    bindSeedControls(); bindPlayButtons()
+  }
+  function descend() {
+    if(!game.continueRun())return
+    labGame=game;inventoryOpen=false;paused=false;lockedUntil=0;renderer.before.clear();renderer.started=-1000;refresh();canvas.focus()
+  }
+  function bindPlayButtons() {
+    const bag=$('#bag');if(bag)bag.onclick=()=>{inventoryOpen=true;refresh();canvas.focus()}
+    const close=$('#close-bag');if(close)close.onclick=()=>{inventoryOpen=false;refresh();canvas.focus()}
+    const proceed=$('#continue');if(proceed)proceed.onclick=()=>{if(paused&&game.status==='playing')paused=false;else restart();refresh();canvas.focus()}
+    document.querySelectorAll<HTMLButtonElement>('[data-use]').forEach(b=>b.onclick=()=>act({type:'use',slot:Number(b.dataset.use)}))
+    document.querySelectorAll<HTMLButtonElement>('[data-equip]').forEach(b=>b.onclick=()=>act({type:'equip',uid:Number(b.dataset.equip)}))
+    document.querySelectorAll<HTMLButtonElement>('[data-drop]').forEach(b=>b.onclick=()=>act({type:'drop',uid:Number(b.dataset.drop)}))
+    document.querySelectorAll<HTMLButtonElement>('[data-upgrade]').forEach(b=>b.onclick=()=>{game.chooseUpgrade(b.dataset.upgrade as UpgradeId);refresh()})
+    document.querySelectorAll<HTMLButtonElement>('[data-buy]').forEach(b=>b.onclick=()=>{game.buy(Number(b.dataset.buy));refresh()})
+    document.querySelectorAll<HTMLButtonElement>('[data-sell]').forEach(b=>b.onclick=()=>{game.sell(Number(b.dataset.sell));refresh()})
+    const down=$('#descend');if(down)down.onclick=descend
   }
   function restart() {
+    window.clearTimeout(victoryTimer)
     game = new Game({ scenario:currentScenario,seed:currentSeed }); labGame=game.scenario==='dungeon'?game:new Game({scenario:'dungeon',seed:currentSeed})
-    paused = false; lockedUntil = 0; renderer.before.clear(); renderer.started=-1000; refresh(); canvas.focus()
+    inventoryOpen = false; paused = false; lockedUntil = 0; renderer.before.clear(); renderer.started=-1000; refresh(); canvas.focus()
+  }
+  function scheduleVictory() {
+    if(game.status==='victory') {
+      const finished=game
+      victoryTimer=window.setTimeout(()=>{if(game===finished&&finished.status==='victory'){finished.finishVictory();refresh()}},650)
+    }
   }
   function act(action: Action) {
     if (!ready || paused || mode !== 'combat' || performance.now() < lockedUntil || game.status !== 'playing') return
     renderer.transition(game)
     if (game.act(action)) lockedUntil = performance.now() + 185
-    refresh()
+    scheduleVictory()
+    inventoryOpen=false; refresh()
   }
   document.querySelectorAll<HTMLButtonElement>('[data-mode]').forEach(button => {
     button.onclick = () => {
@@ -101,9 +131,13 @@ export function startApp() {
     const move=moves[event.key] ?? moves[event.key.toLowerCase()]
     if (move || event.key === ' ' || event.key === '.' || event.key === 'Enter') event.preventDefault()
     if (event.repeat || mode !== 'combat') return
-    if (event.key === 'Escape') { paused=!paused; refresh(); return }
+    if (event.key.toLowerCase()==='i' && game.status==='playing' && !paused) {inventoryOpen=!inventoryOpen;refresh();return}
+    if (event.key === 'Escape') {if(inventoryOpen)inventoryOpen=false;else paused=!paused;refresh();return}
+    if(inventoryOpen)return
+    if(game.status==='camp') {if(event.key==='Enter')descend();return}
+    if(/^[1-3]$/.test(event.key)) {act({type:'use',slot:Number(event.key)-1});return}
     if (event.key.toLowerCase()==='r' && game.status !== 'playing') { restart(); return }
-    if (move) act({type:'move',dx:move[0],dy:move[1]})
+    if (move) act({type:event.shiftKey?'attack':'move',dx:move[0],dy:move[1]})
     else if (event.key === ' ' || event.key === '.') act({type:'wait'})
     else if (event.key.toLowerCase() === 'e' || event.key === 'Enter') act({type:'interact'})
   })

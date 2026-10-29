@@ -11,9 +11,12 @@ Mỗi bước đi là một quyết định. Quan sát ý định của kẻ đ�
 - Sương mù che vùng chưa khám phá, cùng minimap ghi nhớ những nơi đã đi qua.
 - Bẫy gai gây sát thương cho cả người chơi lẫn quái vật.
 - Tàn hỏa tăng sức mạnh và bình máu giúp bạn tiếp tục hành trình.
+- Kiếm, giáo và rìu có phạm vi đánh khác nhau; trang bị, kinh nghiệm và cấp độ giúp định hình lối chơi.
+- Điểm tiếp tế giữa tầng cho phép mua đồ bằng vàng và chọn nâng cấp cho hành trình.
+- Boss Thú Vương Tàn Hỏa có đòn húc, đập đất và giai đoạn cuồng nộ với tín hiệu báo trước.
 - Chết sẽ kết thúc lượt chơi; bạn có thể thử lại cùng hầm ngục hoặc khám phá một seed mới.
 
-Bản chơi hiện tại diễn ra trong một tầng gồm chín phòng. Hãy tìm cầu thang để hoàn thành chuyến thám hiểm — bạn có thể lựa chọn giao chiến hoặc tìm cách vượt qua kẻ địch.
+Hành trình diễn ra qua ba tầng hầm ngục, từ khu canh gác đến điện nghi lễ. Hãy tìm cầu thang, lựa chọn giao chiến hoặc vượt qua kẻ địch, rồi đối đầu Thú Vương để mang ánh lửa trở lại pháo đài.
 
 ## Chạy dự án
 

@@ -1,7 +1,7 @@
 import manifest from './asset-manifest.json'
 
 export type Direction = 'front' | 'back' | 'left' | 'right'
-export type ActorKind = 'player' | 'monster' | 'warrior' | 'boss'
+export type ActorKind = 'player' | 'monster' | 'warrior' | 'ranger' | 'boss'
 export type Rect = readonly [number, number, number, number]
 export const TILE = 16
 export const files = manifest
@@ -25,11 +25,13 @@ export const crops = {
 } as const satisfies Record<string, Rect>
 
 export function actorSheet(kind: ActorKind, direction: Direction) {
+  if(kind==='ranger')kind='warrior'
   if (kind === 'player') return `Characters/Player/Player_walk_${direction === 'back' ? 'behind' : direction}.png`
   if (kind === 'warrior') return `Characters/Warrior/warrior_walk_${direction === 'back' ? 'behind' : direction}.png`
   return `Characters/Monster/${kind === 'boss' ? 'BossMonster' : 'Monster'}_walk_${direction}.png`
 }
 export function actorMeta(kind: ActorKind, direction: Direction) {
+  if(kind==='ranger')kind='warrior'
   const size = kind === 'player' ? 17 : kind === 'warrior' ? 22 : 16
   const frames = kind === 'player' ? (direction === 'front' ? 7 : 8) : kind === 'warrior' ? (direction === 'left' || direction === 'right' ? 8 : 12) : 4
   return { size, frames, anchor: [size / 2, size - 1] as const }

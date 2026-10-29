@@ -24,11 +24,12 @@ export class Renderer {
       const v = floorVariant(board, x, y)
       sprite(ctx, atlas, v === 0 ? crops.floorCrack : v < 3 ? crops.floorDust : crops.floor, px, py)
       if (t === '>') sprite(ctx, atlas, crops.stairs, px, py)
-      if (t === '+') {
+      if (t === '+' || t === 'G') {
         ctx.fillStyle = '#342b26'; ctx.fillRect(px + 1, py, 14, 16)
         ctx.fillStyle = '#9d7950'; ctx.fillRect(px + 2, py + 1, 12, 14)
         ctx.fillStyle = '#d7b97e'; ctx.fillRect(px + 10, py + 8, 2, 2)
         ctx.strokeStyle = '#533b29'; ctx.strokeRect(px + 3.5, py + 2.5, 9, 11)
+        if(t==='G') {ctx.fillStyle='#ed6c5844';ctx.fillRect(px,py,16,16);ctx.fillStyle='#b8a389';for(const n of [3,7,11])ctx.fillRect(px+n,py,1,16)}
       }
       return
     }
@@ -57,7 +58,8 @@ export class Renderer {
       if (debug.ids) {
         const shape = wallShape(board, x, y)
         ctx.font = '4px monospace'; ctx.fillStyle = '#e9e0cb'
-        ctx.fillText(solid ? `${shape.edges.toString(16)}:${shape.notches.join('')}` : tile(board,x,y)==='>'?'ST':'F', x * 16 + 1, y * 16 + 6)
+        const t=tile(board,x,y)
+        ctx.fillText(t==='B'?'B':t==='G'?'G':solid ? `${shape.edges.toString(16)}:${shape.notches.join('')}` : t==='>'?'ST':'F', x * 16 + 1, y * 16 + 6)
       }
     }
   }
@@ -79,6 +81,7 @@ export class Renderer {
     if (game.scenario === 'dungeon' && !debug.reveal) this.fog(game)
     ctx.setTransform(1,0,0,1,0,0)
     if (game.scenario === 'dungeon') this.minimap(game)
+    if(game.bossActive||game.status==='victory')this.bossHud(game)
   }
   dynamics(game: Game, time: number, debug: DebugOptions, reveal: boolean, ease = 1, progress = 1) {
     const ctx = this.ctx, visible = (p: Point) => reveal || game.canSee(p)
@@ -111,7 +114,15 @@ export class Renderer {
       if (item.kind==='ember') {
         ctx.fillStyle='#ed805226';ctx.beginPath();ctx.arc(item.x*16+8,item.y*16+8,9,0,Math.PI*2);ctx.fill()
         sprite(ctx,'Others/Others.png',[16,0,16,16],item.x*16,item.y*16)
-      } else sprite(ctx,'Others/HUD.png',crops.potion,item.x*16,item.y*16)
+      } else if(item.kind==='heal')sprite(ctx,'Others/HUD.png',crops.potion,item.x*16,item.y*16)
+      else if(item.kind==='gold')sprite(ctx,'Others/Coin.png',[0,Math.floor(time/120)%6*16,16,16],item.x*16,item.y*16)
+      else {
+        const color=item.tier===2?'#c48bf2':item.tier===1?'#e2be66':'#c4c6bb'
+        ctx.fillStyle='#15171bbc';ctx.fillRect(item.x*16+2,item.y*16+2,12,12)
+        ctx.strokeStyle=color;ctx.lineWidth=.6;ctx.strokeRect(item.x*16+2,item.y*16+2,12,12)
+        if(item.itemId==='armor') {ctx.fillStyle=color;ctx.beginPath();ctx.moveTo(item.x*16+4,item.y*16+4);ctx.lineTo(item.x*16+12,item.y*16+4);ctx.lineTo(item.x*16+11,item.y*16+11);ctx.lineTo(item.x*16+8,item.y*16+13);ctx.lineTo(item.x*16+5,item.y*16+11);ctx.fill()}
+        else sprite(ctx,`Weapons/Weapons_${item.tier===2?'purple':item.tier===1?'gold':'normal'}_right.png`,item.itemId==='axe'?[59,48,32,16]:item.itemId==='spear'?[59,64,32,16]:crops.sword,item.x*16,item.y*16+4,16,8)
+      }
     }
     for (const e of game.enemies.filter(e => e.hp > 0 && visible(e))) for (const p of e.intent.filter(visible)) {
       ctx.fillStyle = `rgba(224,77,62,${.22 + Math.sin(time / 140) * .08})`; ctx.fillRect(p.x * 16, p.y * 16, 16, 16)
@@ -129,8 +140,15 @@ export class Renderer {
       const prev = this.before.get(a.id) ?? a, moving = progress < 1 && (prev.x !== a.x || prev.y !== a.y)
       const x = (prev.x + (a.x - prev.x) * ease) * 16 + 8, y = (prev.y + (a.y - prev.y) * ease) * 16 + 15
       this.actor(a.kind, a.facing, x, y, time, moving)
+      if(a.kind==='boss') {ctx.strokeStyle=a.enraged?'#ff4f3c':'#df9d60';ctx.lineWidth=.6;ctx.beginPath();ctx.ellipse(x,y,7,3,0,0,Math.PI*2);ctx.stroke()}
+      if(a.kind==='ranger') {ctx.fillStyle='#efcb76';ctx.font='bold 5px monospace';ctx.fillText('N',x+6,y-10)}
       if (a.kind === 'player') { ctx.strokeStyle = '#e1bc78'; ctx.lineWidth = .6; ctx.beginPath(); ctx.ellipse(x, y, 6, 2, 0, 0, Math.PI * 2); ctx.stroke() }
       else this.enemyBar(a, x, y)
+    }
+    if(game.status==='victory'&&game.boss) {
+      ctx.globalAlpha=Math.max(0,1-(time-this.started)/650)
+      this.actor('boss',game.boss.facing,game.boss.x*16+8,game.boss.y*16+15,time,false)
+      ctx.globalAlpha=1
     }
     if (progress < 1 && game.hits.some(h => h.color === '#ffdb93')) {
       const p = game.player, dx = p.facing === 'left' ? -1 : p.facing === 'right' ? 1 : 0, dy = p.facing === 'back' ? -1 : p.facing === 'front' ? 1 : 0
@@ -160,6 +178,15 @@ export class Renderer {
       ctx.fillRect(left+x*scale,top+y*scale,scale,scale)
     }
     ctx.fillStyle='#f2d8a1';ctx.fillRect(left+game.player.x*scale-1,top+game.player.y*scale-1,5,5)
+  }
+  bossHud(game:Game) {
+    const boss=game.boss;if(!boss)return
+    const ctx=this.ctx,x=40,y=22,w=610
+    ctx.fillStyle='#0d1116ed';ctx.fillRect(x-12,y-8,w+24,57)
+    ctx.font='15px Segoe UI';ctx.fillStyle='#e8be89';ctx.fillText('THÚ VƯƠNG TÀN HỎA',x,y+10)
+    const state=boss.intent.length?(boss.attackType==='charge'?'CHUẨN BỊ HÚC':'CHUẨN BỊ ĐẬP ĐẤT'):boss.recovery?'HỒI SỨC':boss.enraged?'CUỒNG NỘ':'ĐANG TIẾP CẬN'
+    ctx.font='11px Segoe UI';ctx.fillStyle='#e9977a';ctx.fillText(`${state} · ${boss.hp}/${boss.maxHp} HP`,x+300,y+10)
+    ctx.fillStyle='#392a29';ctx.fillRect(x,y+23,w,6);ctx.fillStyle=boss.enraged?'#e36f56':'#bd855e';ctx.fillRect(x,y+23,w*boss.hp/boss.maxHp,6)
   }
   enemyBar(a: Actor, x: number, y: number) {
     const ctx = this.ctx, top = y - (a.kind === 'warrior' ? 25 : 19)
