@@ -1,5 +1,7 @@
 import { actorMeta, actorSheet, crops } from '../data/sprites'
 import { sprite } from './assets'
+import { equippedWeaponSprite } from '../data/weaponSprites'
+import type { WeaponKind } from '../data/items'
 import type { ActorKind, Direction } from '../data/sprites'
 import type { Game } from '../game/Game'
 import type { Actor } from '../game/types'
@@ -108,7 +110,10 @@ export class Renderer {
         ctx.fillStyle='#15171bbc';ctx.fillRect(item.x*16+2,item.y*16+2,12,12)
         ctx.strokeStyle=color;ctx.lineWidth=.6;ctx.strokeRect(item.x*16+2,item.y*16+2,12,12)
         if(item.itemId==='armor') {ctx.fillStyle=color;ctx.beginPath();ctx.moveTo(item.x*16+4,item.y*16+4);ctx.lineTo(item.x*16+12,item.y*16+4);ctx.lineTo(item.x*16+11,item.y*16+11);ctx.lineTo(item.x*16+8,item.y*16+13);ctx.lineTo(item.x*16+5,item.y*16+11);ctx.fill()}
-        else sprite(ctx,`Weapons/Weapons_${item.tier===2?'purple':item.tier===1?'gold':'normal'}_right.png`,item.itemId==='axe'?[59,48,32,16]:item.itemId==='spear'?[59,64,32,16]:crops.sword,item.x*16,item.y*16+4,item.itemId==='sword'?15:16,item.itemId==='sword'?6:8)
+        else {
+          const art=equippedWeaponSprite(item.itemId==='axe'?'axe':item.itemId==='spear'?'spear':'sword',item.tier??0)
+          sprite(ctx,art.path,art.rect,item.x*16,item.y*16)
+        }
       }
     }
     for (const e of game.enemies.filter(e => e.hp > 0 && visible(e))) for (const p of e.intent.filter(visible)) {
@@ -135,9 +140,9 @@ export class Renderer {
         const swing=attacking?Math.sin(Math.max(0,phase)*Math.PI/2):0
         const side=a.facing==='left'?-1:1
         const reach=swing*3
-        ctx.save();ctx.translate(x+side*6+dx*reach,y-7+dy*reach);ctx.rotate(-Math.PI/2+side*swing*Math.PI/2)
-        const sword=game.weapon.id==='sword'
-        sprite(ctx,`Weapons/Weapons_${game.weapon.tier===2?'purple':game.weapon.tier===1?'gold':'normal'}_right.png`,game.weapon.id==='axe'?[59,48,32,16]:game.weapon.id==='spear'?[59,64,32,16]:crops.sword,sword?-1:-4,sword?-3:-4,sword?15:16,sword?6:8);ctx.restore()
+        ctx.save();ctx.translate(x+side*6+dx*reach,y-7+dy*reach);ctx.rotate(side*swing*Math.PI/2)
+        const art=equippedWeaponSprite(game.weapon.id as WeaponKind,game.weapon.tier)
+        sprite(ctx,art.path,art.rect,-art.grip[0],-art.grip[1]);ctx.restore()
       }
       if(!this.reducedMotion&&progress<1&&game.events.some(e=>e.type==='damage'&&e.x===a.x&&e.y===a.y)) {
         ctx.strokeStyle='#ffe6bb';ctx.lineWidth=1;ctx.strokeRect(x-7,y-16,14,16)

@@ -21,7 +21,6 @@ export const crops = {
   coin: [0, 0, 16, 16],
   heart: [0, 0, 16, 16],
   potion: [48, 16, 16, 16],
-  sword: [75, 84, 15, 6],
 } as const satisfies Record<string, Rect>
 
 export function actorSheet(kind: ActorKind, direction: Direction) {

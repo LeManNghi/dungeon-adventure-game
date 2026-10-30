@@ -39,9 +39,12 @@ Các tọa độ dưới đây dùng pixel nguồn, gốc trên trái. Ảnh đ�
 | Đồng xu frame đầu | Coin | [0,0,16,16] | Chưa có cơ chế nhặt |
 | Tim đầy | HUD | [0,0,16,16] | Biểu tượng giao diện |
 | Bình hồi máu đỏ | HUD | [48,16,16,16] | Nhặt khi thiếu HP |
-| Kiếm ngang | Weapons_normal_right | [59,80,32,16] | Vùng hình tham chiếu; combat dùng hiệu ứng chém Canvas |
+| Kiếm đứng | Weapons_*_up | [0,0,16,16] | Hình vũ khí độc lập |
+| Búa đứng | Weapons_*_up | [16,0,16,16] | Hình vũ khí độc lập |
+| Chùy đứng | Weapons_*_up | [32,0,16,16] | Hình vũ khí độc lập |
+| Lưỡi hái đứng | Weapons_*_up | [48,0,16,16] | Hình vũ khí độc lập |
 
-HUD (80×80), Others (64×64), Sheet/DamagedSheet (64×64) và các bộ vũ khí được giữ nguyên. Weapons trái/phải có canvas 100×125, hướng lên 64×80; không chia đều theo kích thước canvas để giả định frame. Chưa gán toàn bộ các mảnh vũ khí vào gameplay mốc 2.
+HUD (80×80), Others (64×64), Sheet/DamagedSheet (64×64) và các bộ vũ khí được giữ nguyên. Weapons trái/phải có canvas 100×125, hướng lên 64×80. Renderer hiện dùng ảnh `_up` làm nguồn chuẩn: bốn cột tương ứng kiếm, búa, chùy, lưỡi hái; mỗi hàng 16 px là một biến thể riêng. Quy tắc này đã đối chiếu trực tiếp ảnh và pixel, không áp dụng cho atlas trái/phải. Cả thường/vàng/tím dùng chung vùng cắt ở `src/data/weaponSprites.ts`. Vũ khí được vẽ đúng tỉ lệ và xoay quanh cán, không gộp các ô hoặc dùng vùng [59,*,32,16] cũ.
 
 ## Quy tắc ghép tường
 
