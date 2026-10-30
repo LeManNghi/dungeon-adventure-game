@@ -4,13 +4,21 @@ import { upgrades } from '../data/upgrades'
 import { balance } from '../data/balance'
 
 export function playerPanel(g:Game) {
-  const p=g.player,potion=g.inventory.find(i=>i.kind==='potion')
+  const p=g.player
   return `<p class="eyebrow">NGƯỜI GIỮ LỬA</p><div class="stat-title"><h2>Kẻ thám hiểm</h2><span>LV. ${g.level}</span></div>
   <div class="health-label"><span>Sinh lực</span><strong>${p.hp} <small>/ ${p.maxHp}</small></strong></div><div class="health-track"><i style="width:${p.hp/p.maxHp*100}%"></i></div>
   <div class="xp-track" aria-label="Kinh nghiệm"><i style="width:${g.xp/g.xpToNext*100}%"></i></div><div class="stat-row"><span>XP ${g.xp}/${g.xpToNext}</span><strong>${g.gold} vàng</strong></div>
-  <div class="stat-row"><span>${g.weapon.name}</span><strong>${g.attack}${g.charged?` + ${g.charged}`:''} sát thương</strong></div><div class="stat-row"><span>Giáp / chắn</span><strong>${g.defense} / ${g.shield}</strong></div>
+  <div class="stat-row"><span>Sát thương</span><strong id="player-attack">${g.attack}${g.charged?` + ${g.charged}`:''}</strong></div><div class="stat-row"><span>Giáp / chắn</span><strong>${g.defense} / ${g.shield}</strong></div><div class="stat-row"><span>Lượt / địch đã hạ</span><strong>${g.turn} / ${g.kills}</strong></div>
+  <div class="equipment-block"><p class="eyebrow">TRANG BỊ HIỆN TẠI</p><span>Vũ khí</span><strong>${g.weapon.name}</strong><span>Giáp</span><strong>${g.armor?.name??'Chưa trang bị'}</strong></div>
   <div class="objective"><strong>${g.status==='camp'?'Tiếp tế trước chặng mới':g.recovering?'Cần hồi sức — nhấn Space':g.floor===3?'Hạ Thú Vương Tàn Hỏa':'Tìm cầu thang để xuống tiếp'}</strong><p>${g.recovering?'Rìu cần một lượt chờ sau khi chém.':weaponDescriptions[g.weapon.id as keyof typeof weaponDescriptions]}</p></div>
-  <div class="panel-actions"><button id="bag" class="secondary" ${g.status!=='playing'?'disabled':''}>I · Túi ${g.inventory.length}/${INVENTORY_LIMIT}</button><button data-use="0" class="secondary" ${g.status!=='playing'||!potion||p.hp===p.maxHp||g.recovering?'disabled':''}>1 · Máu ×${potion?.quantity??0}</button></div>`
+  `
+}
+export function bagSummary(g:Game) {
+  const active=g.status==='playing'&&!g.recovering
+  return `<p class="eyebrow">TÚI ĐỒ · ${g.inventory.length}/${INVENTORY_LIMIT}</p><div class="bag-items">${g.inventory.map(i=>{
+    const equipped=i.uid===g.weaponUid||i.uid===g.armorUid,slot=g.inventory.filter(a=>a.kind==='potion').indexOf(i)
+    return `<div class="bag-item"><span>${i.kind==='potion'?`[${slot+1}] `:''}${i.name}${i.quantity>1?` ×${i.quantity}`:''}</span>${i.kind==='potion'?`<button class="secondary" data-use="${slot}" ${!active||g.player.hp===g.player.maxHp?'disabled':''}>Dùng</button>`:`<small>${equipped?'Đang dùng':'Dự trữ'}</small>`}</div>`
+  }).join('')}</div><button id="bag" class="secondary full" ${g.status!=='playing'?'disabled':''}>I · Quản lý hành trang</button>`
 }
 export function inventoryPanel(g:Game) {
   return `<div class="modal-content"><p class="eyebrow">HÀNH TRANG · ${g.inventory.length}/${INVENTORY_LIMIT}</p><h2>Chuẩn bị bước tiếp theo.</h2><p>Mở túi không tốn lượt. Trang bị, bỏ đồ hoặc uống thuốc tốn một lượt và địch sẽ hành động.</p>

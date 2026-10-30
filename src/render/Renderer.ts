@@ -1,12 +1,11 @@
 import { actorMeta, actorSheet, crops } from '../data/sprites'
-import { images, sprite } from './assets'
-import type { ActorKind, Direction, Rect } from '../data/sprites'
+import { sprite } from './assets'
+import type { ActorKind, Direction } from '../data/sprites'
 import type { Game } from '../game/Game'
 import type { Actor } from '../game/types'
 import { floor, floorVariant, tile, walkable, wallShape } from '../world/tiles'
 import type { Board, Point } from '../world/tiles'
 const atlas = 'Map/Map_tileset.png'
-export type DebugOptions = { grid: boolean; ids: boolean; collision: boolean; reveal?: boolean; decorations?: boolean; labFog?: boolean }
 export class Renderer {
   ctx: CanvasRenderingContext2D
   before = new Map<number, Point>()
@@ -48,27 +47,15 @@ export class Renderer {
     }
     if (shape.edges & 4) { ctx.fillStyle = '#08090b45'; ctx.fillRect(px, py + 16, 16, 2) }
   }
-  board(board: Board, debug: DebugOptions) {
-    for (let y = 0; y < board.height; y++) for (let x = 0; x < board.width; x++) this.drawTile(board, x, y)
-    const ctx = this.ctx
-    for (let y = 0; y < board.height; y++) for (let x = 0; x < board.width; x++) {
-      const solid = !walkable(board, x, y)
-      if (debug.collision && solid) { ctx.fillStyle = '#d952773d'; ctx.fillRect(x * 16, y * 16, 16, 16) }
-      if (debug.grid) { ctx.strokeStyle = '#cfdecd40'; ctx.lineWidth = .3; ctx.strokeRect(x * 16, y * 16, 16, 16) }
-      if (debug.ids) {
-        const shape = wallShape(board, x, y)
-        ctx.font = '4px monospace'; ctx.fillStyle = '#e9e0cb'
-        const t=tile(board,x,y)
-        ctx.fillText(t==='B'?'B':t==='G'?'G':solid ? `${shape.edges.toString(16)}:${shape.notches.join('')}` : t==='>'?'ST':'F', x * 16 + 1, y * 16 + 6)
-      }
-    }
+  board(board: Board) {
+    for (let y=0;y<board.height;y++)for(let x=0;x<board.width;x++)this.drawTile(board,x,y)
   }
   actor(kind: ActorKind, direction: Direction, x: number, y: number, time: number, moving: boolean, scale = 1) {
     const meta = actorMeta(kind, direction), frame = moving ? Math.floor(time / 85) % meta.frames : 0, ctx = this.ctx
     ctx.fillStyle = '#05060866'; ctx.beginPath(); ctx.ellipse(x, y - 1, 5 * scale, 2 * scale, 0, 0, Math.PI * 2); ctx.fill()
     sprite(ctx, actorSheet(kind, direction), [0, frame * meta.size, meta.size, meta.size], Math.round(x - meta.anchor[0] * scale), Math.round(y - meta.anchor[1] * scale), meta.size * scale, meta.size * scale)
   }
-  combat(game: Game, time: number, debug: DebugOptions) {
+  combat(game: Game, time: number) {
     this.reset()
     const ctx = this.ctx, progress = Math.min(1, Math.max(0, (Math.max(0,time - this.started)) / 180)), ease = this.reducedMotion?1:1 - (1 - progress) ** 3
     const old = this.before.get(0) ?? game.player
@@ -76,16 +63,16 @@ export class Renderer {
     const scale = 3
     const ox = Math.max(this.canvas.width / scale - game.board.width * 16, Math.min(0, this.canvas.width / scale / 2 - camera.x))
     const oy = Math.max(this.canvas.height / scale - game.board.height * 16, Math.min(0, this.canvas.height / scale / 2 - camera.y))
-    ctx.scale(scale, scale); ctx.translate(Math.round(ox), Math.round(oy)); this.board(game.board, { ...debug, ids: false })
-    this.dynamics(game,time,debug,Boolean(debug.reveal),ease,progress)
-    if (game.scenario === 'dungeon' && !debug.reveal) this.fog(game)
+    ctx.scale(scale, scale); ctx.translate(Math.round(ox), Math.round(oy)); this.board(game.board)
+    this.dynamics(game,time,ease,progress)
+    if (game.scenario === 'dungeon') this.fog(game)
     ctx.setTransform(1,0,0,1,0,0)
     if (game.scenario === 'dungeon') this.minimap(game)
     if(game.bossActive||game.status==='victory')this.bossHud(game)
   }
-  dynamics(game: Game, time: number, debug: DebugOptions, reveal: boolean, ease = 1, progress = 1) {
-    const ctx = this.ctx, visible = (p: Point) => reveal || game.canSee(p)
-    if (debug.decorations !== false) {
+  dynamics(game: Game, time: number, ease = 1, progress = 1) {
+    const ctx = this.ctx, visible = (p: Point) => game.canSee(p)
+    {
       const decor = game.scenario === 'arena' ? [{ x:3,y:3,kind:'skull' },...[5,13,21].map(x=>({x,y:1,kind:'torch'}))] : game.decorations
       for (const d of decor) {
         if (d.kind === 'barrel') continue
@@ -132,7 +119,7 @@ export class Renderer {
     const actors = [game.player, ...game.enemies].filter(a => a.hp > 0 && visible(a))
     const layered: ({type:'actor'; y:number; actor:Actor} | {type:'barrel'; y:number; x:number})[] = actors.map(actor=>({type:'actor', y:actor.y,actor}))
     // Barrels retain a visible silhouette even when decorative details are disabled.
-    for(const d of game.decorations.filter(d=>d.kind==='barrel' && (reveal || game.explored.has(`${d.x},${d.y}`)))) layered.push({type:'barrel',x:d.x,y:d.y})
+    for(const d of game.decorations.filter(d=>d.kind==='barrel' && (game.explored.has(`${d.x},${d.y}`)))) layered.push({type:'barrel',x:d.x,y:d.y})
     layered.sort((a,b)=>a.y-b.y)
     for (const entry of layered) {
       if(entry.type==='barrel') { sprite(ctx,'Map/Decorations_tileset.png',crops.barrel,entry.x*16,entry.y*16-8);continue }
@@ -210,54 +197,5 @@ export class Renderer {
     ctx.fillStyle = '#111318'; ctx.fillRect(x - 7, top, 14, 2)
     ctx.fillStyle = a.intent.length ? '#ffb477' : '#c56a59'; ctx.fillRect(x - 7, top, 14 * a.hp / a.maxHp, 2)
     if (a.recovery) { ctx.font = '5px monospace'; ctx.fillStyle = '#a2d7d2'; ctx.fillText('Z', x + 7, y - 19) }
-  }
-  lab(board: Board, debug: DebugOptions, game?: Game, time = 0) {
-    const scale=Math.min(2,this.canvas.width/(board.width*16),this.canvas.height/(board.height*16))
-    this.reset(); this.ctx.scale(scale, scale)
-    this.ctx.translate((this.canvas.width / scale - board.width * 16) / 2, (this.canvas.height / scale - board.height * 16) / 2)
-    this.board(board, debug)
-    if(game) {
-      this.dynamics(game,time,debug,!debug.labFog)
-      if(debug.labFog) this.fog(game)
-    }
-  }
-  asset(path: string, time: number, grid: boolean, selectedCrop?: Rect) {
-    this.reset()
-    const fit=Math.min(this.canvas.width/960,this.canvas.height/672)
-    this.ctx.translate((this.canvas.width-960*fit)/2,(this.canvas.height-672*fit)/2);this.ctx.scale(fit,fit)
-    const img = images.get(path)!, ctx = this.ctx, scale = Math.min(4, Math.floor(850 / img.width), Math.floor(540 / img.height)) || 1, x = 48, y = 65
-    for (let yy = 0; yy < img.height * scale; yy += 16) for (let xx = 0; xx < img.width * scale; xx += 16) {
-      ctx.fillStyle = ((xx + yy) / 16) % 2 ? '#2c2d33' : '#23252a'; ctx.fillRect(x + xx, y + yy, Math.min(16, img.width * scale - xx), Math.min(16, img.height * scale - yy))
-    }
-    ctx.drawImage(img, x, y, img.width * scale, img.height * scale)
-    ctx.fillStyle = '#c0b497'; ctx.font = '14px monospace'; ctx.fillText(`${img.width} × ${img.height} px / ${scale}×`, x, y - 18)
-    const match = path.match(/Characters\/(Player|Warrior|Monster)\/(BossMonster|Player|warrior|Monster)_walk_(\w+)\.png/)
-    if (match) {
-      const kind: ActorKind = match[2] === 'BossMonster' ? 'boss' : match[1]!.toLowerCase() as ActorKind
-      const direction = match[3] === 'behind' ? 'back' : match[3] as Direction, meta = actorMeta(kind, direction)
-      ctx.fillText(`${meta.size} × ${meta.size} / ${meta.frames} frames / chân (${meta.anchor.join(', ')})`, 300, 96)
-      this.actor(kind, direction, 430, 260, time, true, 6)
-      ctx.strokeStyle = '#dda85f'; ctx.strokeRect(430 - meta.anchor[0] * 6, 260 - meta.anchor[1] * 6, meta.size * 6, meta.size * 6)
-      ctx.fillStyle = '#66d9c1'; ctx.fillRect(426, 258, 8, 4)
-      ctx.fillStyle = '#b6b9bb'; ctx.fillText('Chấm xanh: điểm đặt chân', 300, 330); ctx.fillText('Khung vàng: giới hạn frame', 300, 354)
-      if (grid) for (let i = 0; i < meta.frames; i++) { ctx.strokeStyle = '#7ce8c875'; ctx.strokeRect(x, y + i * meta.size * scale, meta.size * scale, meta.size * scale) }
-    } else if (grid) {
-      ctx.strokeStyle = '#9fc9b255'; ctx.font = '9px monospace'
-      for (let yy = 0; yy < img.height; yy += 16) for (let xx = 0; xx < img.width; xx += 16) {
-        ctx.strokeRect(x + xx * scale, y + yy * scale, Math.min(16, img.width - xx) * scale, Math.min(16, img.height - yy) * scale)
-        ctx.fillStyle = '#b5e1ca'; ctx.fillText(`${xx},${yy}`, x + xx * scale + 1, y + yy * scale + 10)
-      }
-    }
-    if (!match) {
-      const frameWidth = path.endsWith('Player_idle.png') ? 17 : path.includes('Torch_left') || path.includes('Torch_right') ? 32 : 16
-      const frameHeight = path.endsWith('Player_idle.png') ? 17 : 16
-      const animated = path.endsWith('Player_idle.png') || /^Map\/(Torch(?:_left|_right)?|Spike)\.png$/.test(path) || path === 'Others/Coin.png'
-      if (animated) {
-        const count = img.height / frameHeight, f = Math.floor(time / 130) % count
-        sprite(ctx, path, [0, f * frameHeight, frameWidth, frameHeight], 480, 200, frameWidth * 6, frameHeight * 6)
-        ctx.fillStyle = '#c0b497'; ctx.font = '14px monospace'; ctx.fillText(`${frameWidth} × ${frameHeight} / ${count} frames`, 400, 160)
-      }
-    }
-    if (selectedCrop) { ctx.strokeStyle = '#ffca70'; ctx.lineWidth = 2; ctx.strokeRect(x + selectedCrop[0] * scale, y + selectedCrop[1] * scale, selectedCrop[2] * scale, selectedCrop[3] * scale) }
   }
 }
