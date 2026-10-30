@@ -121,7 +121,7 @@ export class Renderer {
         ctx.fillStyle='#15171bbc';ctx.fillRect(item.x*16+2,item.y*16+2,12,12)
         ctx.strokeStyle=color;ctx.lineWidth=.6;ctx.strokeRect(item.x*16+2,item.y*16+2,12,12)
         if(item.itemId==='armor') {ctx.fillStyle=color;ctx.beginPath();ctx.moveTo(item.x*16+4,item.y*16+4);ctx.lineTo(item.x*16+12,item.y*16+4);ctx.lineTo(item.x*16+11,item.y*16+11);ctx.lineTo(item.x*16+8,item.y*16+13);ctx.lineTo(item.x*16+5,item.y*16+11);ctx.fill()}
-        else sprite(ctx,`Weapons/Weapons_${item.tier===2?'purple':item.tier===1?'gold':'normal'}_right.png`,item.itemId==='axe'?[59,48,32,16]:item.itemId==='spear'?[59,64,32,16]:crops.sword,item.x*16,item.y*16+4,16,8)
+        else sprite(ctx,`Weapons/Weapons_${item.tier===2?'purple':item.tier===1?'gold':'normal'}_right.png`,item.itemId==='axe'?[59,48,32,16]:item.itemId==='spear'?[59,64,32,16]:crops.sword,item.x*16,item.y*16+4,item.itemId==='sword'?15:16,item.itemId==='sword'?6:8)
       }
     }
     for (const e of game.enemies.filter(e => e.hp > 0 && visible(e))) for (const p of e.intent.filter(visible)) {
@@ -143,9 +143,14 @@ export class Renderer {
       if(a.kind==='player') {
         const attacking=!this.reducedMotion&&progress<1&&game.events.some(e=>e.type==='attack')
         const dx=a.facing==='left'?-1:a.facing==='right'?1:0,dy=a.facing==='back'?-1:a.facing==='front'?1:0
-        const reach=attacking?Math.sin(progress*Math.PI)*(game.weapon.id==='spear'?15:8):0
-        ctx.save();ctx.translate(x+dx*(6+reach),y-7+dy*(6+reach));ctx.rotate(a.facing==='left'?Math.PI:a.facing==='back'?-Math.PI/2:a.facing==='front'?Math.PI/2:0)
-        sprite(ctx,`Weapons/Weapons_${game.weapon.tier===2?'purple':game.weapon.tier===1?'gold':'normal'}_right.png`,game.weapon.id==='axe'?[59,48,32,16]:game.weapon.id==='spear'?[59,64,32,16]:crops.sword,-4,-4,16,8);ctx.restore()
+        // Lower the blade quickly from upright to horizontal, then lift it back.
+        const phase=progress<.4?progress/.4:(1-progress)/.6
+        const swing=attacking?Math.sin(Math.max(0,phase)*Math.PI/2):0
+        const side=a.facing==='left'?-1:1
+        const reach=swing*3
+        ctx.save();ctx.translate(x+side*6+dx*reach,y-7+dy*reach);ctx.rotate(-Math.PI/2+side*swing*Math.PI/2)
+        const sword=game.weapon.id==='sword'
+        sprite(ctx,`Weapons/Weapons_${game.weapon.tier===2?'purple':game.weapon.tier===1?'gold':'normal'}_right.png`,game.weapon.id==='axe'?[59,48,32,16]:game.weapon.id==='spear'?[59,64,32,16]:crops.sword,sword?-1:-4,sword?-3:-4,sword?15:16,sword?6:8);ctx.restore()
       }
       if(!this.reducedMotion&&progress<1&&game.events.some(e=>e.type==='damage'&&e.x===a.x&&e.y===a.y)) {
         ctx.strokeStyle='#ffe6bb';ctx.lineWidth=1;ctx.strokeRect(x-7,y-16,14,16)
