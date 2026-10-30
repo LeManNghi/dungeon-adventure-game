@@ -1,3 +1,5 @@
+import { bindTouchControls } from './touchControls'
+import type { ReadPanel } from './touchControls'
 import { loadPreferences, savePreferences } from './preferences'
 import { GameAudio } from '../systems/audio'
 import { contextualHint, helpPanel } from './help'
@@ -23,6 +25,15 @@ export function startApp() {
   let currentScenario: 'arena' | 'dungeon' = params.get('scenario') === 'arena' ? 'arena' : 'dungeon'
   let game = new Game({ scenario: currentScenario, seed: currentSeed }), paused = false, ready = false, lockedUntil = 0
   let inventoryOpen = false
+  let readPanel:ReadPanel|undefined
+  const mobileLayout=matchMedia('(max-width:820px), (max-width:950px) and (max-height:500px), (pointer:coarse)')
+  const touch=bindTouchControls({
+    perform:action=>{if(!inventoryOpen&&!readPanel)act(action)},
+    canAct:()=>ready&&!helpOpen&&!inventoryOpen&&!readPanel&&!paused&&game.status==='playing'&&performance.now()>=lockedUntil,
+    open:panel=>{if(game.status!=='playing'||helpOpen||paused)return;inventoryOpen=panel==='bag';readPanel=panel==='bag'?undefined:panel;refresh()},
+    pause:()=>{if(game.status==='playing'){inventoryOpen=false;readPanel=undefined;paused=!paused;refresh()}}
+  })
+  function closePanels() {helpOpen=false;inventoryOpen=false;readPanel=undefined;paused=false;refresh();canvas.focus({preventScroll:true})}
   let victoryTimer: number | undefined
   const escape = (s: string) => s.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('"', '&quot;')
   function seedControls() {
@@ -48,32 +59,38 @@ export function startApp() {
     $('#scene-name').textContent = dungeon ? `01 / TẦNG ${game.floor} · ${game.board.name.toUpperCase()}` : '01 / PHÒNG LUYỆN TẬP'
     $('#scene-state').textContent = !ready ? 'ĐANG TẢI ASSETS…' : `LƯỢT ${String(game.turn).padStart(3,'0')} · ${paused ? 'TẠM DỪNG' : game.status === 'playing' ? 'CHỜ BẠN HÀNH ĐỘNG' : game.status==='camp'?'ĐIỂM TIẾP TẾ':game.status==='victory'?'THÚ VƯƠNG ĐÃ GỤC':'KẾT THÚC'}`
     $('#coords').textContent = `${p.x}, ${p.y}`
-    $('#stage-hint').textContent = contextualHint(game)
+    $('#stage-hint').textContent = contextualHint(game,mobileLayout.matches)
     const overlay = $('#overlay')
-    overlay.hidden = (!helpOpen && !paused && !inventoryOpen && !['camp','dead','won'].includes(game.status))
+    overlay.hidden = (!helpOpen && !paused && !inventoryOpen && !readPanel && !['camp','dead','won'].includes(game.status))
     if (!overlay.hidden) {
       if(helpOpen)overlay.innerHTML=helpPanel()
       else if(game.status==='camp')overlay.innerHTML=campPanel(game)
+      else if(readPanel&&!paused)overlay.innerHTML=readPanel==='stats'?`<div class="modal-content"><p class="eyebrow">NHÂN VẬT & HÀNH TRÌNH</p>${playerPanel(game).replace('id="player-attack"','class="player-attack"')}<button data-mobile-new-seed>Khám phá seed mới</button><button data-mobile-restart>Chơi lại cùng seed</button><button data-close-panel>Đóng</button></div>`:`<div class="modal-content"><p class="eyebrow">NHẬT KÝ HÀNH TRÌNH</p><ol class="log">${game.log.map(l=>`<li>${escape(l)}</li>`).join('')}</ol><button data-close-panel>Đóng</button></div>`
       else if(inventoryOpen&&!paused)overlay.innerHTML=inventoryPanel(game)
       else if(paused&&game.status==='playing')overlay.innerHTML='<div class="modal-content"><p class="eyebrow">NGHỈ MỘT CHÚT</p><h2>Đợi bước tiếp theo.</h2><p>Thế giới đang chờ bạn.</p><button id="continue">Tiếp tục →</button></div>'
       else overlay.innerHTML=endingPanel(game)
+      if(helpOpen||inventoryOpen||readPanel||(paused&&game.status==='playing'))overlay.insertAdjacentHTML('afterbegin','<button class="mobile-modal-close" data-close-panel aria-label="Đóng bảng thông tin">× Đóng</button>')
     }
     $('#context').innerHTML = playerPanel(game) + `<details class="run-settings"><summary>Bản đồ và seed</summary><label class="select-label" for="scenario">Chế độ chơi</label><select id="scenario"><option value="dungeon" ${dungeon?'selected':''}>Khám phá dungeon</option><option value="arena" ${!dungeon?'selected':''}>Phòng luyện tập</option></select>${seedControls()}<button class="secondary full" id="restart">Bắt đầu lại</button></details>`
     $('#restart').onclick = restart
     $<HTMLSelectElement>('#scenario').onchange = e => { currentScenario=(e.target as HTMLSelectElement).value as 'arena'|'dungeon';restart();syncUrl() }
     $('#journal').innerHTML = `<p class="eyebrow">NHẬT KÝ HÀNH TRÌNH</p><ol class="log">${game.log.slice(0,12).map(l=>`<li>${escape(l)}</li>`).join('')}</ol><div class="tip"><strong>Đọc ý định của địch</strong><p>Ô đỏ là vùng sắp bị đánh. Bước ra ngoài trước lượt tiếp theo; tận dụng lúc lính canh hồi sức.</p></div>`
 
-    const closeHelp=$('#close-help');if(closeHelp)closeHelp.onclick=()=>{helpOpen=false;refresh();canvas.focus()}
+    const closeHelp=$('#close-help');if(closeHelp)closeHelp.onclick=()=>{helpOpen=false;refresh();canvas.focus({preventScroll:true})}
+    document.querySelectorAll<HTMLButtonElement>('[data-close-panel]').forEach(b=>b.onclick=closePanels)
+    const newSeed=$('[data-mobile-new-seed]');if(newSeed)newSeed.onclick=()=>$('#new-seed').click()
+    const replay=$('[data-mobile-restart]');if(replay)replay.onclick=restart
+    touch.update(game,!ready||helpOpen||inventoryOpen||Boolean(readPanel)||paused)
     bindSeedControls(); bindPlayButtons()
   }
   function descend() {
     if(!game.continueRun())return
-    inventoryOpen=false;paused=false;lockedUntil=0;renderer.before.clear();renderer.started=-1000;refresh();canvas.focus()
+    inventoryOpen=false;readPanel=undefined;paused=false;lockedUntil=0;renderer.before.clear();renderer.started=-1000;refresh();canvas.focus({preventScroll:true})
   }
   function bindPlayButtons() {
-    const bag=$('#bag');if(bag)bag.onclick=()=>{inventoryOpen=true;refresh();canvas.focus()}
-    const close=$('#close-bag');if(close)close.onclick=()=>{inventoryOpen=false;refresh();canvas.focus()}
-    const proceed=$('#continue');if(proceed)proceed.onclick=()=>{if(paused&&game.status==='playing')paused=false;else restart();refresh();canvas.focus()}
+    const bag=$('#bag');if(bag)bag.onclick=()=>{inventoryOpen=true;refresh();canvas.focus({preventScroll:true})}
+    const close=$('#close-bag');if(close)close.onclick=()=>{inventoryOpen=false;refresh();canvas.focus({preventScroll:true})}
+    const proceed=$('#continue');if(proceed)proceed.onclick=()=>{if(paused&&game.status==='playing')paused=false;else restart();refresh();canvas.focus({preventScroll:true})}
     document.querySelectorAll<HTMLButtonElement>('[data-use]').forEach(b=>b.onclick=()=>act({type:'use',slot:Number(b.dataset.use)}))
     document.querySelectorAll<HTMLButtonElement>('[data-equip]').forEach(b=>b.onclick=()=>act({type:'equip',uid:Number(b.dataset.equip)}))
     document.querySelectorAll<HTMLButtonElement>('[data-drop]').forEach(b=>b.onclick=()=>act({type:'drop',uid:Number(b.dataset.drop)}))
@@ -85,7 +102,7 @@ export function startApp() {
   function restart() {
     window.clearTimeout(victoryTimer)
     game = new Game({ scenario:currentScenario,seed:currentSeed })
-    helpOpen=false;inventoryOpen = false; paused = false; lockedUntil = 0; renderer.before.clear(); renderer.started=-1000; refresh(); canvas.focus()
+    touch.reset();readPanel=undefined;helpOpen=false;inventoryOpen = false; paused = false; lockedUntil = 0; renderer.before.clear(); renderer.started=-1000; refresh(); canvas.focus({preventScroll:true})
   }
   function scheduleVictory() {
     if(game.status==='victory') {
@@ -94,15 +111,16 @@ export function startApp() {
     }
   }
   function act(action: Action) {
-    if (!ready || helpOpen || paused || performance.now() < lockedUntil || game.status !== 'playing') return
+    if (!ready || helpOpen || readPanel || paused || performance.now() < lockedUntil || game.status !== 'playing') return
     const before=new Map([game.player,...game.enemies].map(a=>[a.id,{x:a.x,y:a.y}]))
     if (game.act(action)) {renderer.before=before;renderer.started=performance.now();lockedUntil=performance.now()+185;audio.play(game.events)}
     scheduleVictory()
     inventoryOpen=false; refresh()
   }
   window.addEventListener('keydown', event => {
-    if(event.key==='Escape'&&helpOpen){event.preventDefault();helpOpen=false;refresh();canvas.focus();return}
-    if(event.key==='?'&&!event.repeat&&!(event.target instanceof HTMLInputElement)){event.preventDefault();helpOpen=!helpOpen;refresh();canvas.focus();return}
+    if(event.key==='Escape'&&helpOpen){event.preventDefault();helpOpen=false;refresh();canvas.focus({preventScroll:true});return}
+    if(event.key==='?'&&!event.repeat&&!(event.target instanceof HTMLInputElement)){event.preventDefault();helpOpen=!helpOpen;refresh();canvas.focus({preventScroll:true});return}
+    if(readPanel){if(event.key==='Escape')closePanels();return}
     if(helpOpen)return
     audio.unlock()
     if (event.target instanceof HTMLSelectElement || event.target instanceof HTMLInputElement || event.target instanceof HTMLButtonElement) return
@@ -121,22 +139,23 @@ export function startApp() {
     else if (event.key.toLowerCase() === 'e' || event.key === 'Enter') act({type:'interact'})
   })
   window.addEventListener('blur',()=> { audio.suspend();if (game.status === 'playing') { paused=true; refresh() } })
-  canvas.onpointerdown=()=>{audio.unlock();canvas.focus()}
+  canvas.onpointerdown=()=>{audio.unlock();canvas.focus({preventScroll:true})}
   document.addEventListener('pointerdown',()=>audio.unlock())
   document.addEventListener('visibilitychange',()=>{if(document.hidden){audio.suspend();if(game.status==='playing'){paused=true;refresh()}}})
-  $('#help').onclick=()=>{helpOpen=!helpOpen;refresh();canvas.focus()}
+  $('#help').onclick=()=>{touch.reset();helpOpen=!helpOpen;refresh();canvas.focus({preventScroll:true})}
   const sound=$<HTMLInputElement>('#sound'),volume=$<HTMLInputElement>('#volume'),motion=$<HTMLInputElement>('#motion')
   sound.checked=settings.sound;volume.value=String(settings.volume*100);motion.checked=settings.reducedMotion
   const saveSettings=()=>{settings.sound=sound.checked;settings.volume=Number(volume.value)/100;settings.reducedMotion=motion.checked;renderer.reducedMotion=settings.reducedMotion;savePreferences(settings);audio.update();audio.unlock()}
   sound.onchange=saveSettings;volume.oninput=saveSettings;motion.onchange=saveSettings
   $('#onboarding').hidden=settings.introduced
-  $('#dismiss-intro').onclick=()=>{settings.introduced=true;savePreferences(settings);$('#onboarding').hidden=true;canvas.focus()}
+  $('#dismiss-intro').onclick=()=>{settings.introduced=true;savePreferences(settings);$('#onboarding').hidden=true;canvas.focus({preventScroll:true})}
   function resizeCanvas() {
     const wrap=canvas.parentElement!,width=wrap.clientWidth,height=wrap.clientHeight
     const ratio=width<600?1.5:1
     canvas.width=Math.max(1,Math.round(width*ratio));canvas.height=Math.max(1,Math.round(height*ratio))
   }
   new ResizeObserver(resizeCanvas).observe(canvas.parentElement!)
+  mobileLayout.addEventListener('change',()=>{touch.reset();refresh()})
   window.addEventListener('resize',resizeCanvas);resizeCanvas()
   function frame(time: number) {
     if (ready) renderer.combat(game,time)
@@ -144,7 +163,7 @@ export function startApp() {
   }
   syncUrl()
   refresh()
-  loadAssets().then(()=> { ready=true; refresh(); canvas.focus(); requestAnimationFrame(frame) }).catch(error=> {
+  loadAssets().then(()=> { ready=true; refresh(); canvas.focus({preventScroll:true}); requestAnimationFrame(frame) }).catch(error=> {
     $('#overlay').hidden=false; $('#overlay').textContent=`Không thể tải assets: ${error.message}. Hãy tải lại trang sau khi kiểm tra các file ảnh.`
     $('#scene-state').textContent='LỖI TẢI ASSETS'
   })

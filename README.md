@@ -16,5 +16,6 @@ Mỗi bước đi là một quyết định. Quan sát ý định của kẻ đ�
 - Boss Thú Vương Tàn Hỏa có đòn húc, đập đất và giai đoạn cuồng nộ với tín hiệu báo trước.
 - Chết sẽ kết thúc lượt chơi; bạn có thể thử lại cùng hầm ngục hoặc khám phá một seed mới.
 - Cẩm nang trong game, cảnh báo nguy hiểm theo tình huống và âm thanh có thể tùy chỉnh.
+- Chơi trên điện thoại với D-pad cảm ứng, nút đánh theo hướng và các bảng hành trang, chỉ số, nhật ký riêng.
 
 Hành trình diễn ra qua ba tầng hầm ngục, từ khu canh gác đến điện nghi lễ. Hãy tìm cầu thang, lựa chọn giao chiến hoặc vượt qua kẻ địch, rồi đối đầu Thú Vương để mang ánh lửa trở lại pháo đài.
