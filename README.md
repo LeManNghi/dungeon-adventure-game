@@ -11,7 +11,7 @@ Mỗi bước đi là một quyết định. Quan sát ý định của kẻ đ�
 - Sương mù che vùng chưa khám phá, cùng minimap ghi nhớ những nơi đã đi qua.
 - Bẫy gai gây sát thương cho cả người chơi lẫn quái vật.
 - Tàn hỏa tăng sức mạnh và bình máu giúp bạn tiếp tục hành trình.
-- Kiếm, giáo và rìu có phạm vi đánh khác nhau; trang bị, kinh nghiệm và cấp độ giúp định hình lối chơi.
+- Kiếm, búa và rìu 2 lưỡi có phạm vi đánh khác nhau; trang bị, kinh nghiệm và cấp độ giúp định hình lối chơi.
 - Điểm tiếp tế giữa tầng cho phép mua đồ bằng vàng và chọn nâng cấp cho hành trình.
 - Boss Thú Vương Tàn Hỏa có đòn húc, đập đất và giai đoạn cuồng nộ với tín hiệu báo trước.
 - Chết sẽ kết thúc lượt chơi; bạn có thể thử lại cùng hầm ngục hoặc khám phá một seed mới.

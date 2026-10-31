@@ -44,8 +44,6 @@ function bossTurn(g:Game,e:Actor) {
   }
   if(e.intent.length) {resolve(g,e);return}
   if(e.recovery) {e.recovery=false;return}
-  // Do not start a new warning while an axe recovery would prevent any dodge.
-  if(g.recovering)return
   const adjacent=distance(e,g.player)===1
   if(!e.enraged&&adjacent&&(e.specialCounter??0)%2===1&&!e.basicUsed) {
     e.basicUsed=true;g.damage(g.player,5,'Thú Vương đánh thường');return

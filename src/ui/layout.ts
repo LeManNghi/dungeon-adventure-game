@@ -21,6 +21,6 @@ export function mountLayout() {
         <p id="touch-tip">Chạm hướng để đi hoặc đánh địch sát bên.</p>
       </section>
     </div>
-    <footer class="page-footer"><span>WASD / ↑↓←→ <b>Đi / đánh</b></span><span>SHIFT + HƯỚNG <b>Đánh tại chỗ</b></span><span>SPACE <b>Chờ</b></span><span>I <b>Túi đồ</b></span><span>1–3 <b>Uống thuốc</b></span><span>E <b>Cầu thang</b></span><span>ESC <b>Tạm dừng</b></span></footer>
+    <footer class="page-footer"><span>WASD / ↑↓←→ <b>Đi / đánh</b></span><span>SHIFT + HƯỚNG <b>Đánh tại chỗ</b></span><span>SPACE <b>Chờ</b></span><span>TÚI ĐỒ <b>Chọn & dùng/bỏ</b></span><span>E <b>Cầu thang</b></span><span>ESC <b>Tạm dừng</b></span></footer>
   </main>`
 }

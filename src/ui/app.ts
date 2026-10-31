@@ -24,7 +24,7 @@ export function startApp() {
   let currentSeed = normalizeSeed(params.get('seed') ?? 'tan-hoa-01')
   let currentScenario: 'arena' | 'dungeon' = params.get('scenario') === 'arena' ? 'arena' : 'dungeon'
   let game = new Game({ scenario: currentScenario, seed: currentSeed }), paused = false, ready = false, lockedUntil = 0
-  let inventoryOpen = false
+  let inventoryOpen = false, selectedUid: number | null = null
   let readPanel:ReadPanel|undefined
   const mobileLayout=matchMedia('(max-width:820px), (max-width:950px) and (max-height:500px), (pointer:coarse)')
   const touch=bindTouchControls({
@@ -53,7 +53,8 @@ export function startApp() {
   }
   function refresh() {
     const p = game.player
-    $('#bag-summary').innerHTML=bagSummary(game)
+    if(selectedUid!==null&&!game.inventory.some(i=>i.uid===selectedUid))selectedUid=null
+    $('#bag-summary').innerHTML=bagSummary(game,selectedUid)
     $('#floor-badge').textContent=`TẦNG ${game.floor} / 3`
     const dungeon = game.scenario === 'dungeon'
     $('#scene-name').textContent = dungeon ? `01 / TẦNG ${game.floor} · ${game.board.name.toUpperCase()}` : '01 / PHÒNG LUYỆN TẬP'
@@ -66,7 +67,7 @@ export function startApp() {
       if(helpOpen)overlay.innerHTML=helpPanel()
       else if(game.status==='camp')overlay.innerHTML=campPanel(game)
       else if(readPanel&&!paused)overlay.innerHTML=readPanel==='stats'?`<div class="modal-content"><p class="eyebrow">NHÂN VẬT & HÀNH TRÌNH</p>${playerPanel(game).replace('id="player-attack"','class="player-attack"')}<button data-mobile-new-seed>Khám phá seed mới</button><button data-mobile-restart>Chơi lại cùng seed</button><button data-close-panel>Đóng</button></div>`:`<div class="modal-content"><p class="eyebrow">NHẬT KÝ HÀNH TRÌNH</p><ol class="log">${game.log.map(l=>`<li>${escape(l)}</li>`).join('')}</ol><button data-close-panel>Đóng</button></div>`
-      else if(inventoryOpen&&!paused)overlay.innerHTML=inventoryPanel(game)
+      else if(inventoryOpen&&!paused)overlay.innerHTML=inventoryPanel(game,selectedUid)
       else if(paused&&game.status==='playing')overlay.innerHTML='<div class="modal-content"><p class="eyebrow">NGHỈ MỘT CHÚT</p><h2>Đợi bước tiếp theo.</h2><p>Thế giới đang chờ bạn.</p><button id="continue">Tiếp tục →</button></div>'
       else overlay.innerHTML=endingPanel(game)
       if(helpOpen||inventoryOpen||readPanel||(paused&&game.status==='playing'))overlay.insertAdjacentHTML('afterbegin','<button class="mobile-modal-close" data-close-panel aria-label="Đóng bảng thông tin">× Đóng</button>')
@@ -91,6 +92,15 @@ export function startApp() {
     const bag=$('#bag');if(bag)bag.onclick=()=>{inventoryOpen=true;refresh();canvas.focus({preventScroll:true})}
     const close=$('#close-bag');if(close)close.onclick=()=>{inventoryOpen=false;refresh();canvas.focus({preventScroll:true})}
     const proceed=$('#continue');if(proceed)proceed.onclick=()=>{if(paused&&game.status==='playing')paused=false;else restart();refresh();canvas.focus({preventScroll:true})}
+    document.querySelectorAll<HTMLButtonElement>('[data-bag-select]').forEach(b=>b.onclick=()=>{selectedUid=selectedUid===Number(b.dataset.bagSelect)?null:Number(b.dataset.bagSelect);refresh()})
+    document.querySelectorAll<HTMLButtonElement>('#bag-action-use').forEach(b=>b.onclick=()=>{
+      const item=game.inventory.find(i=>i.uid===selectedUid);if(!item)return
+      if(item.kind==='potion')act({type:'use',uid:item.uid});else act({type:'equip',uid:item.uid})
+    })
+    document.querySelectorAll<HTMLButtonElement>('#bag-action-drop').forEach(b=>b.onclick=()=>{
+      const item=game.inventory.find(i=>i.uid===selectedUid);if(!item)return
+      act({type:'drop',uid:item.uid})
+    })
     document.querySelectorAll<HTMLButtonElement>('[data-use]').forEach(b=>b.onclick=()=>act({type:'use',slot:Number(b.dataset.use)}))
     document.querySelectorAll<HTMLButtonElement>('[data-equip]').forEach(b=>b.onclick=()=>act({type:'equip',uid:Number(b.dataset.equip)}))
     document.querySelectorAll<HTMLButtonElement>('[data-drop]').forEach(b=>b.onclick=()=>act({type:'drop',uid:Number(b.dataset.drop)}))
@@ -102,7 +112,7 @@ export function startApp() {
   function restart() {
     window.clearTimeout(victoryTimer)
     game = new Game({ scenario:currentScenario,seed:currentSeed })
-    touch.reset();readPanel=undefined;helpOpen=false;inventoryOpen = false; paused = false; lockedUntil = 0; renderer.before.clear(); renderer.started=-1000; refresh(); canvas.focus({preventScroll:true})
+    touch.reset();readPanel=undefined;helpOpen=false;inventoryOpen = false; selectedUid = null; paused = false; lockedUntil = 0; renderer.before.clear(); renderer.started=-1000; refresh(); canvas.focus({preventScroll:true})
   }
   function scheduleVictory() {
     if(game.status==='victory') {
@@ -127,12 +137,12 @@ export function startApp() {
     const moves: Record<string,[number,number]> = { w:[0,-1],ArrowUp:[0,-1],s:[0,1],ArrowDown:[0,1],a:[-1,0],ArrowLeft:[-1,0],d:[1,0],ArrowRight:[1,0] }
     const move=moves[event.key] ?? moves[event.key.toLowerCase()]
     if (move || event.key === ' ' || event.key === '.' || event.key === 'Enter') event.preventDefault()
-    if (event.repeat) return
+    if (event.repeat && !move) return
     if (event.key.toLowerCase()==='i' && game.status==='playing' && !paused) {inventoryOpen=!inventoryOpen;refresh();return}
     if (event.key === 'Escape') {if(inventoryOpen)inventoryOpen=false;else paused=!paused;refresh();return}
     if(inventoryOpen)return
     if(game.status==='camp') {if(event.key==='Enter')descend();return}
-    if(/^[1-3]$/.test(event.key)) {act({type:'use',slot:Number(event.key)-1});return}
+
     if (event.key.toLowerCase()==='r' && game.status !== 'playing') { restart(); return }
     if (move) act({type:event.shiftKey?'attack':'move',dx:move[0],dy:move[1]})
     else if (event.key === ' ' || event.key === '.') act({type:'wait'})

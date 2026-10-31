@@ -31,7 +31,6 @@ export class Game {
   baseAttack = 5
   shield = 0
   charged = 0
-  recovering = false
   status: 'playing'|'camp'|'victory'|'dead'|'won' = 'playing'
   player: Actor = {id:0,kind:'player',x:5,y:10,hp:30,maxHp:30,facing:'front',intent:[],recovery:false}
   enemies: Actor[] = [makeEnemy('monster',1,12,9,1),makeEnemy('warrior',2,20,10,1)]
@@ -61,7 +60,7 @@ export class Game {
     this.scenario=options.scenario??'arena'
     if(this.scenario==='dungeon') {
       this.seed=options.seed??'tan-hoa-01';this.loadFloor(1)
-      this.message('Tìm cầu thang, thu thập trang bị và Tàn hỏa. I mở túi; 1 uống bình máu; Shift + hướng để đánh xa.')
+      this.message('Tìm cầu thang, thu thập trang bị và Tàn hỏa. Chọn vật phẩm trong túi rồi dùng hoặc bỏ; Shift + hướng để đánh xa.')
     } else this.message('Phòng luyện tập: đi vào địch để đánh; tránh ô đỏ trước đòn mạnh.')
     this.updateVision()
   }
@@ -79,7 +78,7 @@ export class Game {
     this.enemies=d.enemies.map((e,i)=>makeEnemy(e.kind,i+1,e.x,e.y,number))
     this.bossArena=d.bossArena;this.bossActive=false;this.bossDefeated=false
     this.visible.clear();this.explored.clear();this.visitedRooms.clear();this.hits=[];this.events=[]
-    this.floorTurn=0;this.recovering=false;this.charged=0;this.status='playing'
+    this.floorTurn=0;this.charged=0;this.status='playing'
     this.enterRoom();this.updateVision();this.message(`Tầng ${number}: ${d.board.name}.`)
   }
   updateVision() {
@@ -198,12 +197,10 @@ export class Game {
     this.player.facing=face(dx,dy)
     const amount=this.attack+this.charged;this.charged=0
     for(const e of targets)this.damage(e,amount)
-    if(kind==='axe')this.recovering=true
     return true
   }
   act(action:Action):boolean {
     if(this.status!=='playing')return false
-    if(this.recovering&&action.type!=='wait') {this.message('Rìu cần hồi sức. Nhấn Space để chờ một lượt.');return false}
     if(action.type==='interact'&&!(this.scenario==='dungeon'&&this.floor<3&&tile(this.board,this.player.x,this.player.y)==='>'))return false
     this.hits=[];this.events=[]
     if(action.type==='move'||action.type==='attack') {
@@ -225,15 +222,19 @@ export class Game {
       this.loot.push({x:this.player.x,y:this.player.y,kind:item.kind==='potion'?'heal':'gear',itemId:item.id,tier:item.tier})
       if(item.quantity>1)item.quantity--;else this.inventory=this.inventory.filter(i=>i!==item)
     } else if(action.type==='use') {
-      const potion=this.inventory.filter(i=>i.kind==='potion')[action.slot]
-      if(!Number.isInteger(action.slot)||action.slot<0||!potion||this.player.hp===this.player.maxHp)return false
+      const potion = action.uid !== undefined
+        ? this.inventory.find(i => i.uid === action.uid && i.kind === 'potion')
+        : (action.slot !== undefined && Number.isInteger(action.slot) && action.slot >= 0
+          ? this.inventory.filter(i => i.kind === 'potion')[action.slot]
+          : undefined)
+      if(!potion||this.player.hp===this.player.maxHp)return false
       const healed=Math.min(balance.potionHeal,this.player.maxHp-this.player.hp);this.player.hp+=healed;potion.quantity--
       if(!potion.quantity)this.inventory=this.inventory.filter(i=>i!==potion)
       this.message(`Uống bình máu: +${healed} HP.`)
       this.emit({type:'heal',x:this.player.x,y:this.player.y,visible:true})
       this.hits.push({x:this.player.x,y:this.player.y,value:`+${healed}`,color:'#8fe2ae'})
     } else if(action.type==='wait') {
-      this.recovering=false;this.pickup();this.charged=3*this.upgradeStacks.patience
+      this.pickup();this.charged=3*this.upgradeStacks.patience
     }
     this.turn++;this.floorTurn++
     if(action.type==='interact') {this.status='camp';this.chosenUpgrade=undefined;this.purchased.clear();this.message('Đã tới điểm tiếp tế. Chọn nâng cấp trước khi xuống tầng.');return true}
